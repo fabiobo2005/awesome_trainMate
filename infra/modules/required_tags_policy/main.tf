@@ -2,6 +2,7 @@ locals {
   tags_map = {
     for tag in var.required_tags : lower(replace(tag, "/[^a-zA-Z0-9]/", "")) => tag
   }
+  subscription_scope = startswith(var.subscription_id, "/subscriptions/") ? var.subscription_id : "/subscriptions/${var.subscription_id}"
 }
 
 resource "azurerm_policy_definition" "required_tag_resources" {
@@ -78,7 +79,7 @@ resource "azurerm_subscription_policy_assignment" "required_tag_resources" {
   for_each             = local.tags_map
   name                 = substr("tm-res-tag-${each.key}-${var.environment}", 0, 64)
   display_name         = "Require ${each.value} on resources"
-  subscription_id      = var.subscription_id
+  subscription_id      = local.subscription_scope
   policy_definition_id = azurerm_policy_definition.required_tag_resources.id
   enforce              = true
 
@@ -93,7 +94,7 @@ resource "azurerm_subscription_policy_assignment" "required_tag_resource_groups"
   for_each             = local.tags_map
   name                 = substr("tm-rg-tag-${each.key}-${var.environment}", 0, 64)
   display_name         = "Require ${each.value} on resource groups"
-  subscription_id      = var.subscription_id
+  subscription_id      = local.subscription_scope
   policy_definition_id = azurerm_policy_definition.required_tag_resource_groups.id
   enforce              = true
 

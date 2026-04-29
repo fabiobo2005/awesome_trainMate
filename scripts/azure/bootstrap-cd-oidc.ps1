@@ -54,12 +54,12 @@ function Write-Step {
 function As-Array {
   param([Parameter(Mandatory = $false)]$InputObject)
   if ($null -eq $InputObject) {
-    return @()
+    return ,@()
   }
   if ($InputObject -is [System.Array]) {
-    return $InputObject
+    return ,$InputObject
   }
-  return @($InputObject)
+  return ,@($InputObject)
 }
 
 function Require-Command {
@@ -281,8 +281,8 @@ function Ensure-FederatedCredential {
 
   $payload = @{
     name        = $CredentialName
-    issuer      = "https://token.actions.githubusercontent.com/"
-    subject     = "repo:$RepositorySlug:ref:refs/heads/$Branch"
+    issuer      = "https://token.actions.githubusercontent.com"
+    subject     = "repo:${RepositorySlug}:ref:refs/heads/${Branch}"
     description = $Description
     audiences   = @("api://AzureADTokenExchange")
   }

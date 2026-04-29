@@ -1,7 +1,7 @@
 resource "azurerm_static_web_app" "frontend" {
   name                               = local.static_web_app_name
   resource_group_name                = module.rg_frontend.name
-  location                           = var.location
+  location                           = var.frontend_location
   sku_tier                           = var.frontend_sku_tier
   sku_size                           = var.frontend_sku_size
   preview_environments_enabled       = true
