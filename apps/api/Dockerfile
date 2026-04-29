@@ -9,7 +9,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build -w apps/api && npm prune --omit=dev
+RUN npm run prisma:generate -w apps/api && npm run build -w apps/api && npm prune --omit=dev
 
 FROM node:22-alpine AS runner
 WORKDIR /workspace
