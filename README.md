@@ -121,4 +121,3 @@ Workflows:
 - `main` is the protected integration branch.
 - New changes should be created in feature/fix/chore branches and merged via Pull Request.
 - Contribution process and PR checklist: `CONTRIBUTING.md` and `.github/pull_request_template.md`.
-
