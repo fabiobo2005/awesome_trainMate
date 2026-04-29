@@ -159,7 +159,13 @@ jobs:
           import sys
 
           path, new_image = sys.argv[1], sys.argv[2]
-          lines = open(path, encoding="utf-8").read().splitlines()
+          original_lines = open(path, encoding="utf-8").read().splitlines()
+          lines = []
+          for line in original_lines:
+              stripped = line.lstrip()
+              if stripped.startswith("provisioningTimeoutInSeconds:") or stripped.startswith("customProvisioningTimeoutInSeconds:"):
+                  continue
+              lines.append(line)
           replaced = False
           for index, line in enumerate(lines):
               if not replaced and line.lstrip().startswith("image:"):
@@ -252,7 +258,13 @@ jobs:
           import sys
 
           path, new_image = sys.argv[1], sys.argv[2]
-          lines = open(path, encoding="utf-8").read().splitlines()
+          original_lines = open(path, encoding="utf-8").read().splitlines()
+          lines = []
+          for line in original_lines:
+              stripped = line.lstrip()
+              if stripped.startswith("provisioningTimeoutInSeconds:") or stripped.startswith("customProvisioningTimeoutInSeconds:"):
+                  continue
+              lines.append(line)
           replaced = False
           for index, line in enumerate(lines):
               if not replaced and line.lstrip().startswith("image:"):

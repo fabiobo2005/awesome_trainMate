@@ -107,6 +107,12 @@ variable "key_vault_soft_delete_retention_days" {
   default     = 90
 }
 
+variable "key_vault_ip_allowlist" {
+  type        = list(string)
+  description = "Public IPv4 addresses allowed to access Key Vault over public endpoint."
+  default     = []
+}
+
 variable "mysql_admin_username" {
   type        = string
   description = "MySQL admin username."
@@ -200,6 +206,12 @@ variable "frontend_sku_size" {
   type        = string
   description = "Azure Static Web App SKU size."
   default     = "Standard"
+}
+
+variable "frontend_location" {
+  type        = string
+  description = "Azure region for Static Web App (must be supported by Microsoft.Web/staticSites)."
+  default     = "centralus"
 }
 
 variable "frontend_api_base_url" {

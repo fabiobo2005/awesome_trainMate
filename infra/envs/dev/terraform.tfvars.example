@@ -8,12 +8,14 @@ environment  = "dev"
 name_prefix  = "trainmate"
 cost_center  = "REPLACE_ME"
 owner        = "admin@MngEnvMCAP198698.onmicrosoft.com"
+frontend_location = "centralus"
 
 # Availability profile
 availability_zone = "1"
 
 # Optional bootstrap admin assignment for Key Vault RBAC (objectId)
 platform_admin_object_id = "REPLACE_ME_OR_EMPTY"
+key_vault_ip_allowlist   = ["REPLACE_WITH_PUBLIC_IP"]
 
 # MySQL bootstrap credentials (store real values in secure pipeline/Key Vault)
 mysql_admin_username = "trainmateadmin"

@@ -12,7 +12,8 @@ resource "azurerm_key_vault" "main" {
 
   network_acls {
     bypass                     = "AzureServices"
-    default_action             = "Deny"
+    default_action             = "Allow"
+    ip_rules                   = var.key_vault_ip_allowlist
     virtual_network_subnet_ids = [azurerm_subnet.backend_aci.id, azurerm_subnet.data_ai_aci.id]
   }
 
