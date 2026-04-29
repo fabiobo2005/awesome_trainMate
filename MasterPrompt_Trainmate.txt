@@ -1,0 +1,218 @@
+Você é um senior full‑stack engineer + Azure cloud architect + DevOps lead. Quero que você me ajude a projetar e construir o app TrainMate (“Seu parceiro de treino, sua evolução constante.”) com foco em MVP, segurança, governança e execução 100% no Azure. Você deve trabalhar em fases com “stop and wait”: após concluir uma fase, pare e aguarde eu escrever “go next” e execute tudo o que for possivel em paralelo com /fleet.
+
+IMPORTANTE (REGRAS DE TRABALHO)
+1) Não crie nada agora. Apenas reconheça o contexto, valide consistência técnica e aguarde meu próximo prompt com instruções da primeira fase.
+2) Nunca peça para eu colar segredos no chat. Nunca repita segredos vistos anteriormente. Se precisar de segredos, instrua a criação via Azure Key Vault ou GitHub Secrets (input interativo).
+3) Todos os testes devem ser cloud-first: health endpoints, chamadas reais no Azure, conectividade real com o MySQL, logs/telemetria no Azure. Nada de “assuma que rodou local”.
+4) Estruture respostas com ALTÍSSIMO detalhamento. Não seja econômico. Use tópicos, checklists e comandos exatos. Sempre que possível, divida em tarefas paralelizáveis (workstreams) para eu executar em paralelo.
+5) Sempre que houver dependências, deixe explícito “depende de X”.
+
+================================================================================
+CONTEXTO FIXO (AZURE)
+================================================================================
+- Região (obrigatória para todos os recursos): Canada Central
+- Objetivo de disponibilidade: colocar tudo na MESMA Availability Zone (AZ) agora (ex.: zone "1"), e preparar para no futuro adicionar outras AZs e distribuir carga. 
+  - Se algum recurso NÃO suportar fixar AZ em Canada Central, documente a limitação e mantenha single-region/single-zone da forma suportada (sem inventar suporte).
+
+Tenant e subscriptions (3-tier obrigatório, cada tier em uma subscription):
+- Tenant ID: 87cc550f-0777-49cd-a8c0-452328e84b0b
+
+Tier 1 (Frontend) — Subscription:
+- ID: 44db531e-5181-4a48-bc71-ed91fd8ea02d
+
+Tier 2 (Backend Node API) — Subscription:
+- ID: 75031adf-a3cb-4051-b7d4-bd19e7d20c78
+
+Tier 3 (Data + AI) — Subscription:
+- ID: 204e10bc-fa25-44fa-84fb-18e5ffe403eb
+
+Conta:
+- admin@MngEnvMCAP198698.onmicrosoft.com
+
+Repo base (obrigatório usar como ponto de partida):
+- https://github.com/fabiobo2005/awesome_trainMate.git
+
+================================================================================
+STACK (SEM EXCEÇÕES)
+================================================================================
+Frontend:
+- React + TypeScript + Material UI + PWA
+- Hospedagem: Azure Static Web Apps (preferencial)
+
+Backend API:
+- Node.js 22 LTS + Express + TypeScript
+- Hospedagem: Azure Container Instances (ACI) — NÃO usar WebApp/App Service
+
+AI/Analytics:
+- Python + FastAPI (algoritmo heurístico; sem chamadas externas)
+- Hospedagem: Azure Container Instances (ACI) — NÃO usar WebApp/App Service
+
+Database:
+- Azure Database for MySQL Flexible Server (Tier 3)
+
+ORM:
+- Prisma (MySQL como source of truth)
+
+IaC:
+- Terraform (tudo em /infra)
+
+CI/CD:
+- GitHub Actions com OIDC para Azure (sem segredos long-lived)
+- Build e publish de imagens (preferencialmente para ACR no Azure; alternativa: GHCR). 
+  - Preferir ACR com permissões via Managed Identity e RBAC.
+
+Arquitetura:
+- 3-tier obrigatório e separado por subscription:
+  - Tier 1: Frontend (SWA) em Subscription 1
+  - Tier 2: Node API em ACI em Subscription 2
+  - Tier 3: MySQL + Python AI em Subscription 3
+
+================================================================================
+SEGURANÇA E GOVERNANÇA (OBRIGATÓRIO)
+================================================================================
+Segredos e identidade:
+- Nunca pedir segredos no chat.
+- Segredos em Azure Key Vault (preferencial) e/ou GitHub Secrets.
+- GitHub Actions deve autenticar no Azure via OIDC.
+- Preferir Managed Identity sempre que possível.
+- Aplicar princípio de menor privilégio (RBAC).
+
+Rede e exposição:
+- Banco MySQL NÃO pode ficar “wide-open” (sem 0.0.0.0/0).
+- Estratégia mínima segura preferida:
+  A) (Preferido) MySQL com Private Access em VNet + containers (ACI) dentro de VNet + peering cross-subscription se necessário.
+  B) (Alternativo) MySQL com firewall restrito a IPs estáticos (ex.: NAT Gateway de saída do subnet onde roda ACI), com regra temporária para meu IP durante testes e remoção após.
+- TLS obrigatório em tudo.
+- CORS restrito no backend.
+
+Validação e hardening app:
+- DTO validation (zod/joi), rate limiting, headers de segurança, tratamento de erros consistente e logs estruturados.
+
+Tags e custo (obrigatório):
+- Criar e aplicar estratégia de tagging para custo/governança, com enforcement via Azure Policy (deny/audit/modify e quando útil herança de tags em subscription/RG).
+- Tags obrigatórias em TODOS os resource groups e recursos:
+  - CostCenter
+  - Environment (dev/test/prod)
+  - Owner (DRI email/alias/time)
+  - Workload=TrainMate
+  - Application=TrainMate
+  - Tier=frontend|backend|data-ai
+- IaC deve padronizar tags e facilitar controle de custos no Cost Management.
+- Observação importante de governança: tags são base para análise de custo e devem ser aplicadas/garantidas por policy para evitar inconsistência de chargeback/showback.
+
+(Referências conceituais: estratégia e enforcement de tags com Azure Policy e tagging para cost management.) 
+
+================================================================================
+FUNCIONALIDADES (MVP OBRIGATÓRIO + ROADMAP)
+================================================================================
+MVP obrigatório:
+1) Autenticação:
+- SSO via Google + Microsoft + Facebook (OAuth2/OIDC).
+- Persistir user profile: email, nome, provider, timestamps, status.
+
+2) Anamnese e objetivos (editável a qualquer momento):
+- Nível: iniciante / intermediário / experiente.
+- Objetivos: hipertrofia, força, emagrecimento, 5k/10k/21k/42k e variações.
+- Anamnese completa (campos opcionais; permitir evolução do formulário sem quebrar dados antigos).
+
+3) Logging de treino:
+- Musculação: exercícios, séries, reps, carga, RPE opcional.
+- Corrida: distância, tempo, pace, HR opcional.
+
+4) Progresso:
+- Métricas agregadas semanal/mensal + gráficos.
+
+5) AI/Analytics (Python):
+- Endpoint /recommendation: plano semanal / próximo treino baseado em logs recentes + objetivos (heurístico, sem chamadas externas).
+- Também considerar ciclos de 30/60/90 dias para sugerir troca de plano.
+
+6) Personal Trainer (MVP simples):
+- Entidade trainer + especialidades + associação user↔trainer.
+
+7) Admin Geral (MVP Simples)
+- Entidade administradora de todo o sistema com acesso a todos os dados do sistema e com permissão de incluir ou excluir dados
+- O primeiro acesso quando o sistema estiver pronto deve sempre ser feito com a entidade administradora. Para esse caso somente criar um mecanismo de usario como admin e uma senha segura que devo precisar consultar em alguma variavel/keyvalt/GitHub secrets/etc
+
+Roadmap (não implementar agora; apenas preparar base/arquitetura):
+- Crie uma sessão bem detalhada do Roadmap para que eu possa editar posteriormente e pedir para o copilot implementar após validação e testes da primeira versão do MVP
+- Biblioteca de exercícios + vídeos, gamificação/rankings/desafios, comunidade, integrações (wearables/nutrição/música), assistente virtual e persona IA avançada.
+
+================================================================================
+MODO DE ENTREGA (Fases e formato fixo)
+================================================================================
+Você deve produzir a solução em fases. Para CADA fase, responda SEMPRE com:
+(A) Objetivo da fase
+(B) Mudanças na árvore de arquivos (file tree)
+(C) Conteúdo pronto para copiar/colar (código/IaC)
+(D) Comandos exatos para executar (Azure/GitHub)
+(E) Passos de validação NO AZURE (cloud-only)
+(F) Checklist de aceitação
+
+Regra de gating:
+- Ao finalizar a fase: pare e pergunte por “go next”.
+
+Sequência fixa de fases (ajustada para ACI):
+1) Repo bootstrap (sem deploy)
+2) IaC base multi-subscription (Terraform):
+   - Resource Groups (Canada Central), Key Vault, App Insights/Log Analytics
+   - Networking mínima segura (VNet/Subnets/NAT se necessário) e desenho cross-subscription
+   - ACR (se usar) e RBAC para pull de imagens
+   - ACI (Node e Python) e SWA (frontend)
+   - MySQL Flexible Server com postura segura de rede
+   - Azure Policy para tags e baseline de governança
+3) DB schema + migrations:
+   - MySQL + Prisma schema + migrações + seed opcional
+   - Tabelas: users, auth_identities, anamnesis (+ subestruturas), goals, workout_sessions, exercises, sets, running_sessions, metrics, trainers, trainer_specialties, user_trainer_association e outras necessárias
+4) Backend Node API (Express + TS):
+   - Endpoints REST (CRUD) para profile/anamnese, workouts, runs, progress
+   - Auth skeleton (provider identity)
+   - Health check /health
+   - OpenAPI spec
+5) Python FastAPI (ACI):
+   - /health + /recommendation + contrato Node↔Python
+6) Frontend React (SWA):
+   - Telas: Dashboard, Log Workout, Log Run, Progress, Profile/Goals
+   - PWA basics
+7) CI/CD:
+   - Build/test/publish containers (Node e Python)
+   - Deploy ACI + SWA via GitHub Actions com OIDC
+8) Hardening:
+   - Key Vault references, CORS/rate limiting, observabilidade, logs, threat notes
+
+================================================================================
+EXECUÇÃO EM PARALELO (workstreams para rodar em paralelo)
+================================================================================
+Sempre que você entregar uma fase, organize suas tarefas em “Workstreams” paralelos. Exemplo:
+
+Workstream 1 — GitHub/Repo:
+- gh repo, estrutura, configs, actions skeleton
+
+Workstream 2 — Terraform/IaC:
+- módulos, providers para 3 subscriptions, state, outputs
+
+Workstream 3 — Identidade & Segurança:
+- OIDC, Managed Identity, RBAC mínimo, Key Vault secrets (nomes apenas)
+
+Workstream 4 — Observabilidade:
+- App Insights/Log Analytics, dashboards básicos, alert rules iniciais
+
+Workstream 5 — Networking:
+- VNet/Subnets, NAT/egress, regras de firewall do MySQL, validação de conectividade
+
+Workstream 6 — Containers:
+- Dockerfiles, build pipeline, imagens, deploy ACI, health checks
+
+Para cada workstream, forneça:
+- Lista de tarefas
+- Dependências
+- Comandos exatos (gh/az/terraform)
+- Validações
+
+================================================================================
+AGORA (o que fazer imediatamente)
+================================================================================
+Não criar nada ainda. Apenas:
+- Confirmar que entendeu as restrições (Canada Central, ACI, mesma AZ, 3 subscriptions)
+- Apontar riscos técnicos previsíveis (ex.: recursos sem suporte a AZ fixa; necessidade de IP estático/NAT para firewall do MySQL; cross-subscription networking) sem inventar capacidades
+- Listar quais informações NÃO-secretas você precisará quando eu der “go next” (ex.: prefixo de nomes, ambiente dev/test/prod, CostCenter, Owner tag, escolha ACR vs GHCR)
+E então parar e aguardar meu próximo prompt.

@@ -1,0 +1,531 @@
+================================================================================
+TRAINMATE — PROMPT MASTER MELHORADO (para ClaudeCode)
+Baseado em: MasterPrompt_Trainmate.txt + análise dos planos de treino reais
+================================================================================
+
+Você é um senior full‑stack engineer + Azure cloud architect + DevOps lead. Quero que você me ajude a projetar e construir o app TrainMate ("Seu parceiro de treino, sua evolução constante.") com foco em MVP, segurança, governança e execução 100% no Azure. Você deve trabalhar em fases com "stop and wait": após concluir uma fase, pare e aguarde eu escrever "go next" e execute tudo o que for possível em paralelo com /fleet.
+
+================================================================================
+IMPORTANTE (REGRAS DE TRABALHO)
+================================================================================
+1) Não crie nada agora. Apenas reconheça o contexto, valide consistência técnica e aguarde meu próximo prompt com instruções da primeira fase.
+2) Nunca peça para eu colar segredos no chat. Nunca repita segredos vistos anteriormente. Se precisar de segredos, instrua a criação via Azure Key Vault ou GitHub Secrets (input interativo).
+3) Todos os testes devem ser cloud-first: health endpoints, chamadas reais no Azure, conectividade real com o MySQL, logs/telemetria no Azure. Nada de "assuma que rodou local".
+4) Estruture respostas com ALTÍSSIMO detalhamento. Não seja econômico. Use tópicos, checklists e comandos exatos. Sempre que possível, divida em tarefas paralelizáveis (workstreams) para eu executar em paralelo.
+5) Sempre que houver dependências, deixe explícito "depende de X".
+
+================================================================================
+CONTEXTO FIXO (AZURE)
+================================================================================
+- Região (obrigatória para todos os recursos): Canada Central
+- Objetivo de disponibilidade: colocar tudo na MESMA Availability Zone (AZ) agora (ex.: zone "1"), e preparar para no futuro adicionar outras AZs e distribuir carga.
+  - Se algum recurso NÃO suportar fixar AZ em Canada Central, documente a limitação e mantenha single-region/single-zone da forma suportada (sem inventar suporte).
+
+Tenant e subscriptions (3-tier obrigatório, cada tier em uma subscription):
+- Tenant ID: 87cc550f-0777-49cd-a8c0-452328e84b0b
+
+Tier 1 (Frontend) — Subscription:
+- ID: 44db531e-5181-4a48-bc71-ed91fd8ea02d
+
+Tier 2 (Backend Node API) — Subscription:
+- ID: 75031adf-a3cb-4051-b7d4-bd19e7d20c78
+
+Tier 3 (Data + AI) — Subscription:
+- ID: 204e10bc-fa25-44fa-84fb-18e5ffe403eb
+
+Conta:
+- admin@MngEnvMCAP198698.onmicrosoft.com
+
+Repo base (obrigatório usar como ponto de partida):
+- https://github.com/fabiobo2005/awesome_trainMate.git
+
+================================================================================
+STACK (SEM EXCEÇÕES)
+================================================================================
+Frontend:
+- React + TypeScript + Material UI + PWA
+- Hospedagem: Azure Static Web Apps (preferencial)
+
+Backend API:
+- Node.js 22 LTS + Express + TypeScript
+- Hospedagem: Azure Container Instances (ACI) — NÃO usar WebApp/App Service
+
+AI/Analytics:
+- Python + FastAPI (algoritmo heurístico; sem chamadas externas)
+- Hospedagem: Azure Container Instances (ACI) — NÃO usar WebApp/App Service
+
+Database:
+- Azure Database for MySQL Flexible Server (Tier 3)
+
+ORM:
+- Prisma (MySQL como source of truth)
+
+IaC:
+- Terraform (tudo em /infra)
+
+CI/CD:
+- GitHub Actions com OIDC para Azure (sem segredos long-lived)
+- Build e publish de imagens (preferencialmente para ACR no Azure; alternativa: GHCR).
+  - Preferir ACR com permissões via Managed Identity e RBAC.
+
+Arquitetura:
+- 3-tier obrigatório e separado por subscription:
+  - Tier 1: Frontend (SWA) em Subscription 1
+  - Tier 2: Node API em ACI em Subscription 2
+  - Tier 3: MySQL + Python AI em Subscription 3
+
+================================================================================
+SEGURANÇA E GOVERNANÇA (OBRIGATÓRIO)
+================================================================================
+Segredos e identidade:
+- Nunca pedir segredos no chat.
+- Segredos em Azure Key Vault (preferencial) e/ou GitHub Secrets.
+- GitHub Actions deve autenticar no Azure via OIDC.
+- Preferir Managed Identity sempre que possível.
+- Aplicar princípio de menor privilégio (RBAC).
+
+Rede e exposição:
+- Banco MySQL NÃO pode ficar "wide-open" (sem 0.0.0.0/0).
+- Estratégia mínima segura preferida:
+  A) (Preferido) MySQL com Private Access em VNet + containers (ACI) dentro de VNet + peering cross-subscription se necessário.
+  B) (Alternativo) MySQL com firewall restrito a IPs estáticos (ex.: NAT Gateway de saída do subnet onde roda ACI), com regra temporária para meu IP durante testes e remoção após.
+- TLS obrigatório em tudo.
+- CORS restrito no backend.
+
+Validação e hardening app:
+- DTO validation (zod/joi), rate limiting, headers de segurança, tratamento de erros consistente e logs estruturados.
+
+Tags e custo (obrigatório):
+- Criar e aplicar estratégia de tagging para custo/governança, com enforcement via Azure Policy.
+- Tags obrigatórias: CostCenter, Environment (dev/test/prod), Owner, Workload=TrainMate, Application=TrainMate, Tier=frontend|backend|data-ai
+
+================================================================================
+CONTEXTO DO DOMÍNIO — PLANOS DE TREINO REAIS (DADOS EXTRAÍDOS)
+================================================================================
+Os dados abaixo foram extraídos de 5 planilhas Excel reais de treino de musculação
+(Julho/2025, Setembro/2025, Novembro/2025, Janeiro/2026, Maio/2026).
+Eles definem o modelo de dados, as regras de negócio e os campos que o sistema DEVE suportar.
+
+--- ESTRUTURA DE UM PLANO DE TREINO ---
+Cada planilha representa um BLOCO DE TREINO mensal/bimestral, composto por:
+- 5 dias de treino de musculação (nomeados por cor): Amarelo, Verde, Vermelho, Laranja, Azul
+  - Cada dia representa um agrupamento muscular diferente (split alternado por grupo muscular)
+- 1 protocolo de Cardiorrespiratório (treino aeróbio/HIIT separado)
+- 1 aba "Sistemas e Métodos" (glossário de métodos de treino — referência)
+- Cada treino é dividido em 4 MICROCICLOS semanais (1ª a 4ª semana / 1º a 4º Microciclo)
+  - A progressão entre microciclos é de volume: séries aumentam de 3 para 4 conforme avança
+
+--- CAMPOS OBRIGATÓRIOS POR EXERCÍCIO (coluna por coluna das planilhas) ---
+1. nome_exercicio (TEXT) — ex: "Supino Reto com Barra", "Agachamento Hack Angular"
+2. series (INT) — número de séries. Variação típica: 2 a 5 séries
+3. repeticoes (INT) — número de repetições. Variação típica: 4 a 30 reps
+4. cadencia (TEXT) — cadência de execução, ex: "2-4" (excêntrico-concêntrico), "2-2", "2-2-2"
+5. intervalo_segundos (INT) — intervalo de descanso em segundos. Variação: 60 a 90 segundos
+6. metodo (TEXT) — método/sistema de treino utilizado (ver lista de métodos abaixo)
+7. observacoes (TEXT) — instruções específicas para o exercício
+8. carga_kg (FLOAT, nullable) — carga em kg registrada pelo usuário (preenchida no momento do treino)
+9. load_total (FLOAT, calculado) — carga total levantada na sessão = séries × repetições × carga_kg
+
+--- MÉTRICAS POR SESSÃO DE TREINO (obrigatórias) ---
+Ao finalizar cada sessão, o usuário deve registrar:
+1. pse (INT, 1-10) — Percepção Subjetiva de Esforço (PSE / RPE)
+2. tempo_sessao_minutos (INT) — duração total da sessão em minutos
+3. unidades_arbitrarias (FLOAT, calculado) — PSE × tempo_sessao_minutos
+4. carga_total_sessao (FLOAT, calculado) — somatório de (séries × repetições × carga_kg) de todos os exercícios da sessão
+
+--- LISTA COMPLETA DE 136 EXERCÍCIOS CATALOGADOS (banco de exercícios inicial) ---
+PEITO:
+- Supino Reto com Barra (4 séries, 4-10 reps, Pirâmide Crescente/Séries Múltiplas)
+- Supino Reto com Halteres (3-4 séries, 10-20 reps, Pirâmide Crescente)
+- Supino Reto com barra (2 séries, 8 reps, Pirâmide Crescente + Série de Saída)
+- Supino Reto Barra (2 séries, 6 reps, Pirâmide Crescente)
+- Supino Inclinado com Barra Guiada (3-4 séries, 8 reps, Ponto Zero)
+- Supino Inclinado com Barra Livre (3-4 séries, 10-15 reps, Pirâmide Crescente)
+- Supino Inclinado com Halteres (2-5 séries, 6-20 reps, Pirâmide Crescente/Séries Múltiplas)
+- Supino Máquina (3-5 séries, 12-15 reps, Pirâmide Crescente)
+- Supino Máquina Reto (3 séries, 20 reps, Séries Múltiplas — aquecimento)
+- Cross Over (3 séries, 10 reps, Série de Saída)
+- Cross Over Máquina (4 séries, 15 reps, Pirâmide Crescente)
+- Crucifixo Inclinado com halteres (3 séries, 10-12 reps, Pico de Alongamento/Pirâmide Crescente)
+- Crucifixo Máquina (3-5 séries, 8-15 reps, Pico de Alongamento/Drop-Set/Pirâmide Crescente)
+- Voador (3-4 séries, 10 reps, Pirâmide Crescente)
+- Push Up TRX (3 séries, 10 reps, Bi-Set)
+
+OMBRO:
+- Desenvolvimento Arnold Alternado (3-4 séries, 12 reps, Pirâmide Crescente)
+- Desenvolvimento com Halteres (2-4 séries, 4-10 reps, Séries Múltiplas/Pirâmide Crescente)
+- Desenvolvimento com halteres (3 séries, 15 reps, Bi-Set)
+- Desenvolvimento Máquina (4-5 séries, 10 reps, Pirâmide Crescente)
+- Elevação Frontal banco 60° supinado com halteres (3-4 séries, 8 reps, Pirâmide Crescente)
+- Elevação Frontal com corda polia baixa (3 séries, 15 reps, Séries Múltiplas)
+- Elevação Lateral Máquina (3-4 séries, 6-15 reps, Ondulatório/Séries Múltiplas)
+- Elevação Lateral Supinada (3 séries, 15 reps, Bi-Set)
+- Elevação Lateral banco 60° dec. Lateral (3 séries, 15 reps, Séries Múltiplas)
+- Elevação Lateral com ANILHAS (3 séries, 20 reps, Séries Múltiplas)
+- Elevação Lateral com Halteres (2-5 séries, 8-15 reps, Pirâmide Crescente)
+- Extensão do Ombro c/ Abdução (3 séries, 10 reps, Ponto Zero)
+- Facepull (3 séries, 10 reps, Bi-Set)
+- Crucifixo Invertido Máquina (3 séries, 10 reps, Séries Múltiplas)
+- Encolhimento com Halteres (3-4 séries, 15 reps, Bi-Set/Séries Múltiplas)
+- Encolhimento com barra Hexagonal (4 séries, 15 reps, Séries Múltiplas)
+
+COSTAS:
+- Barra Fixa (3 séries, 12 reps, Pirâmide Crescente)
+- Barra Fixa Neutra (3-4 séries, 8 reps, Séries Múltiplas — Ponto Zero de 2'')
+- Barra Fixa Neutro (2 séries, 6 reps, Pirâmide Crescente)
+- Barra Fixa Supinada (3 séries, 8 reps, Séries Múltiplas)
+- Puxada Aberta (4-5 séries, 15 reps, Pirâmide Crescente/Séries Múltiplas)
+- Puxada Alta Articulada Pronada (4 séries, 15 reps, Pirâmide Crescente)
+- Puxada Alta Máquina (2 séries, 12 reps, Pirâmide Crescente + Série de Saída)
+- Puxada Articulada Neutra Unilateral (3-4 séries, 10 reps, Pirâmide Crescente)
+- Puxada Supinada (4 séries, 12 reps, Pirâmide Crescente)
+- Puxada Triângulo (3 séries, 10-12 reps, Drop-Set/Pirâmide Crescente)
+- Puxada Unilateral (2 séries, 6 reps, Pirâmide Crescente)
+- Puxada Unilateral Supinada Articulada (3 séries, 10 reps, Pirâmide Crescente)
+- Pulldown (3-5 séries, 10-15 reps, Bi-Set/Drop-Set/Pirâmide Crescente/Séries Múltiplas)
+- Pulldown C/ Corda (3 séries, 15 reps, Pirâmide Crescente)
+- Remada Alta (4 séries, 20 reps, Bi-Set)
+- Remada Alta Polia Baixa (4 séries, 20 reps, Séries Múltiplas)
+- Remada Baixa (3 séries, 12 reps, Pirâmide Crescente)
+- Remada Baixa Aberta Pronada (3 séries, 15 reps, Pirâmide Crescente)
+- Remada Baixa Máquina (2 séries, 10 reps, Pirâmide Crescente)
+- Remada Baixa Triângulo (4 séries, 15 reps, Pirâmide Crescente)
+- Remada Máquina Articulada Aberta Pronada (3 séries, 10 reps, Séries Múltiplas)
+- Remada Máquina Articulada Baixa Unilateral (3 séries, 10 reps, Séries Múltiplas)
+- Remada Máquina Baixa (4-5 séries, 10 reps, Pirâmide Crescente)
+- Remada Máquina Pronada (3 séries, 15 reps, Séries Múltiplas)
+- Remada Serrote (4 séries, 12 reps, Pirâmide Crescente)
+- Remada Unilateral (2-5 séries, 6-15 reps, Pirâmide Crescente/Séries Múltiplas)
+- Extensão Lombar banco romano (3 séries, 12 reps, Séries Múltiplas)
+
+BÍCEPS:
+- Rosca 60° com halteres (4 séries, 10 reps, Séries Múltiplas)
+- Rosca 60° no banco (3 séries, 12 reps, Pirâmide Crescente)
+- Rosca Banco 60° (4 séries, 15 reps, Séries Múltiplas)
+- Rosca Banco 60° Alternada (3-4 séries, 10 reps, Pirâmide Crescente)
+- Rosca Banco 60° em pé (3 séries, 10 reps, Bi-Set)
+- Rosca Banco 60° sentado (3 séries, 10 reps, Bi-Set)
+- Rosca Bayesian Unilateral (3-4 séries, 10 reps, Bi-Set)
+- Rosca Cabo Baixo Unilateral (3-4 séries, 10 reps, Bi-Set)
+- Rosca Direta Barra W (2 séries, 10 reps, Bi-Set + Pirâmide Crescente)
+- Rosca Scott Máquina (4 séries, 8-10 reps, Séries Múltiplas)
+- Rosca Scott Unilateral com halter (4 séries, 10 reps, Bi-Set)
+- Rosca Scott W (4-5 séries, 15 reps, Pirâmide Crescente)
+- Rosca Unilateral com Halter (4 séries, 10 reps, Bi-Set)
+- Rosca W (4-5 séries, 12-15 reps, Pirâmide Crescente/Séries Múltiplas)
+- Rosca cabo alto Unilateral (4 séries, 10 reps, Pirâmide Crescente)
+- Rosca inversa Cabo Baixo (3-4 séries, 10 reps, Bi-Set)
+
+TRÍCEPS:
+- Francês com Halter (4 séries, 4-10 reps, Séries Múltiplas)
+- Tríceps Arremesso Polia (4-5 séries, 15 reps, Pirâmide Crescente)
+- Tríceps Arremesso Unilateral (3 séries, 10 reps, Bi-Set)
+- Tríceps Coice polia baixa e unilateral (3 séries, 10 reps, Bi-Set)
+- Tríceps Francês Polia (3 séries, 12 reps, Pirâmide Crescente)
+- Tríceps Francês Unilateral Polia Baixa (3 séries, 10 reps, Bi-Set)
+- Tríceps Polia Alta (4-5 séries, 12 reps, Pirâmide Crescente)
+- Tríceps Polia Alta com Corda (3 séries, 8 reps, Drop-Set)
+- Tríceps Polia Barra V (2 séries, 10 reps, Bi-Set + Pirâmide Crescente)
+- Tríceps Polia Corda (3 séries, 15 reps, Pirâmide Crescente)
+- Tríceps Polia cruzado supinado com estribo (3 séries, 10 reps, Séries Múltiplas)
+- Tríceps Pulley Unilateral (3 séries, 10 reps, Bi-Set)
+- Tríceps Testa com Halteres Banco Declinado (3 séries, 10 reps, Séries Múltiplas)
+- Paralela (2 séries, 6 reps, Pirâmide Crescente)
+- Paralela livre (3 séries, 8 reps, Séries Múltiplas)
+
+PERNAS / QUADRÍCEPS / POSTERIOR:
+- Agachamento Hack (2 séries, 6 reps, Pirâmide Crescente)
+- Agachamento Hack Angular (3-4 séries, 12 reps, Pirâmide Crescente)
+- Agachamento Hack Linear (4 séries, 15 reps, Pirâmide Crescente)
+- Agachamento Livre (4-5 séries, 12 reps, Pirâmide Crescente)
+- Agachamento Pêndulo (4 séries, 15 reps, Pirâmide Crescente)
+- Agachamento Smith (2 séries, 10 reps, Pirâmide Crescente)
+- Agachamento com o cinto (3 séries, 10 reps, Séries Múltiplas)
+- Cadeira Extensora (3-4 séries, 10-20 reps, Drop-Set/Pirâmide Crescente/Pico de Contração)
+- Cadeira Extensora Drop-Mecânico (3 séries, 10 reps, Pirâmide Crescente — Quadril 130°+90°)
+- Cadeira Extensora Unilateral (3 séries, 10 reps, Séries Múltiplas)
+- Cadeira Extensora com variação biomecânica (3 séries, 10 reps, Bi-Set)
+- Cadeira Flexora (3-4 séries, 6-15 reps, Pirâmide Crescente/Séries Múltiplas)
+- Cadeira Flexora Excêntrica Unilateral (3 séries, 15 reps, Pirâmide Crescente)
+- Cadeira Flexora excêntrica unilateral (3 séries, 10 reps, Séries Múltiplas)
+- Flexão Nórdica (3 séries, 8 reps, Ponto Zero)
+- Flexão Nórdica Unilateral Máquina (3 séries, 10 reps, Séries Múltiplas)
+- Flexora vertical (3 séries, 15 reps, Séries Múltiplas)
+- Leg Press 45° (2-4 séries, 10-12 reps, Pirâmide Crescente)
+- Leg Press Deitado Unilateral (Horizontal) (3-4 séries, 12 reps, Pirâmide Crescente)
+- Leg Press Unilateral Horizontal (4 séries, 10 reps, Pirâmide Crescente)
+- Leg Press Vertical (3 séries, 12 reps, Séries Múltiplas)
+- Levantamento Terra (2 séries, 4 reps, Pirâmide Crescente)
+- Mesa Flexora (3 séries, 15 reps, Séries Múltiplas)
+- Mesa Flexora Unilateral (3 séries, 10 reps, Pirâmide Crescente)
+- Stiff Banco Romano com anilha (3 séries, 12 reps, Séries Múltiplas)
+- Stiff com Barra (4 séries, 12-15 reps, Pirâmide Crescente)
+- Stiff com barra pequena (3 séries, 10 reps, Bi-Set)
+- Terra Sumô (4 séries, 6-10 reps, Séries Múltiplas)
+- Cadeira Abdutora (3-4 séries, 15-20 reps, Pirâmide Crescente/Séries Múltiplas)
+- Cadeira Adutora (3-4 séries, 15-20 reps, Pirâmide Crescente/Séries Múltiplas)
+- Banco Romano (3 séries, 10 reps, Bi-Set)
+
+PANTURRILHA:
+- Panturrilha Vertical (4 séries, 20 reps, Pirâmide Crescente)
+- Panturrilha no Leg 180° (5 séries, 20 reps, Pirâmide Crescente)
+- Panturrilha no leg 180 excêntrica unilateral (4 séries, 10 reps, Séries Múltiplas)
+- Panturrilha no leg press vertical (4 séries, 20 reps, Pirâmide Crescente)
+- Panturrilha sentado (4 séries, 15 reps, Pirâmide Crescente)
+
+ABDÔMEN / CORE:
+- Crunch Abdome Máquina (4 séries, 15 reps, Séries Múltiplas)
+- Infra Abdome Paralela (4 séries, 15 reps, Séries Múltiplas)
+- Infra Abdome Solo (4 séries, 15 reps, Séries Múltiplas)
+- Prancha Isométrica dec. Dorsal (3 séries, 30 seg, Séries Múltiplas)
+- Prancha isométrica dec. Ventral (3 séries, 30 seg, Séries Múltiplas)
+- Recuo no colchonete (3 séries, 12 reps, Séries Múltiplas)
+- Rolinho Abd. (3 séries, 10 reps, Bi-Set)
+- Rolinho Abdome (3 séries, 12 reps, Séries Múltiplas)
+- Supra Abdome Máquina deitado (3-4 séries, 20 reps, Séries Múltiplas)
+
+ANTEBRAÇO:
+- Flexão de Punho cabo baixo (3-4 séries, 10 reps, Bi-Set — de costas para a polia)
+
+--- MÉTODOS/SISTEMAS DE TREINO SUPORTADOS (obrigatórios no banco de dados) ---
+O sistema deve ter uma tabela de métodos com nome e descrição completa:
+
+1. BI-SET: dois exercícios realizados em sequência sem descanso entre eles; o descanso é feito após o segundo exercício.
+2. TRI-SET: três exercícios em sequência sem descanso entre eles.
+3. SUPER SÉRIE: quatro exercícios para o mesmo grupamento muscular sem descanso, seguidos de intervalo de recuperação.
+4. PIRÂMIDE CRESCENTE: séries múltiplas com aumento de carga e redução de repetições a cada série.
+5. PIRÂMIDE DECRESCENTE: séries múltiplas com redução de carga e aumento de repetições a cada série.
+6. SÉRIES MÚLTIPLAS: séries repetidas com a mesma carga e volume.
+7. DROP-SET: após atingir o número de repetições, reduzir 20-40% da carga imediatamente e repetir até a falha.
+8. SÉRIE DE SAÍDA: última série com redução de 50% do peso, executada até a falha concêntrica.
+9. PONTO ZERO: execução com pausa isométrica no ponto de maior alongamento do músculo (geralmente 2 segundos).
+10. ONDULATÓRIO: variação de repetições e peso dentro da mesma série de forma sequenciada (ex: 5RM + 15RM).
+11. EXAUSTÃO: todas as séries executadas até a falha concêntrica momentânea.
+12. EXCÊNTRICO: fase excêntrica feita pelo aluno, fase concêntrica assistida por parceiro; cargas acima de 100% 1RM.
+13. REPETIÇÕES FORÇADAS: exercício até falha concêntrica natural + 3 repetições forçadas com auxílio de outro segmento.
+14. GVT: 10 séries de 10RM com cargas ~60% 1RM, intervalo curto (~30s), agonista + antagonista.
+15. REST-PAUSE: série + descanso 20s + nova série até a falha + descanso 20s + nova série até a falha, sem reduzir carga.
+16. FST-7: 7 séries com intervalos de 30-45s para estimular o alongamento da fáscia muscular.
+17. SST: 8 repetições máximas + 10s de descanso + repetir com redução de volume; ao chegar em 1 rep, reduzir carga 20% e repetir.
+18. SISTEMA 3/7: progressão de repetições com a mesma carga (3 reps → descanso 10s → 4 reps → ... → 7 reps → descanso completo).
+19. PICO DE CONTRAÇÃO: isometria de 1-2 segundos no pico de contração muscular.
+20. PICO DE ALONGAMENTO: isometria de 1-2 segundos no pico de alongamento (geralmente posição inicial).
+
+--- PROTOCOLOS CARDIORRESPIRATÓRIOS SUPORTADOS ---
+O sistema deve registrar treinos cardio com os seguintes tipos:
+1. AERÓBIO CONTÍNUO — ESCADA ERGOMÉTRICA
+   - Intensidade: Leve/Moderada
+   - Volume progressivo por microciclo: 1000→1200→1400→1600 degraus (ou 20'→25'→30'→35')
+   - Campos: tipo_cardio, intensidade, volume (degraus ou minutos), PSE
+2. AERÓBIO LONGO — BICICLETA ERGOMÉTRICA
+   - Intensidade: Leve/Moderada
+   - Volume progressivo: 30'→35'→40'→45' (ou 10km→12km→15km→20km)
+   - Campos: tipo_cardio, intensidade, volume (km ou minutos), PSE
+3. HIIT LONGO — BICICLETA ERGOMÉTRICA
+   - Intensidade: Vigorosa
+   - Volume progressivo: 30'→35'→40'→45' (ou 10km→12km→15km→20km)
+   - Campos: tipo_cardio, intensidade, volume (km ou minutos), PSE
+4. TREINAMENTO INTERVALADO — ESTEIRA
+   - Intensidade: Vigorosa
+   - Estrutura: tiros de PSE 8-10, duração 1', recuperação 1' (velocidade <5km/h)
+   - Volume progressivo: 10→11→12→13 tiros
+   - Campos: tipo_cardio, intensidade, num_tiros, duracao_tiro_seg, velocidade_recuperacao, PSE
+
+--- ESTRUTURA DE PROGRESSÃO (MICROCICLOS) ---
+- Cada bloco mensal/bimestral contém 4 microciclos semanais
+- Progressão de volume: microciclos 1-2 usam X séries; microciclos 3-4 adicionam 1 série nos exercícios principais
+- A carga (kg) é registrada pelo usuário a cada sessão
+- Load total por exercício = séries × repetições × carga_kg
+- Unidades Arbitrárias (UA) por sessão = PSE × tempo_sessao_minutos
+- Carga total da sessão = somatório de loads de todos os exercícios
+
+--- DIVISÃO DE TREINO (SPLIT) ---
+O split é "alternado por grupo muscular" com 5 dias:
+- Treino 1 (Amarelo): Peito + Ombro Anterior + Tríceps
+- Treino 2 (Verde): Costas (Puxadas verticais) + Deltoide Posterior + Bíceps
+- Treino 3 (Vermelho): Posterior de Coxa + Lombar + Quadríceps + Panturrilha
+- Treino 4 (Laranja): Peito (variação) + Ombro + Tríceps (variação)
+- Treino 5 (Azul): Costas (Remadas) + Bíceps (variação) + Antebraço
+- Treino Extra: Cardiorrespiratório (qualquer dia, separado dos treinos de musculação)
+
+================================================================================
+FUNCIONALIDADES (MVP OBRIGATÓRIO + ROADMAP)
+================================================================================
+MVP obrigatório:
+
+1) Autenticação:
+- No MVP vou usar os usuarios:
+ - aluno (para os usuarios geral do app)
+ - personal (para gerenciar os treinos dos seus alunos que possuem vinculos)
+ - admin (para administração geral de todo o sistema
+- A Senha pode ser simples como 123456 e solicitar para trocar a senha no primeiro acesso
+- Persistir user profile: email, nome, provider, timestamps, status.
+
+- Em Roadmap implementar
+ - SSO via Google + Microsoft + Facebook (OAuth2/OIDC).
+ - deixe o sistema preparado para quando for implementar as novas funcionalidades do roadmap e correções do backlog
+
+2) Anamnese e objetivos (editável a qualquer momento):
+- Nível: iniciante / intermediário / experiente.
+- Objetivos: hipertrofia, força, emagrecimento, 5k/10k/21k/42k e variações.
+- Anamnese completa (campos opcionais; permitir evolução do formulário sem quebrar dados antigos).
+
+3) Logging de treino de musculação:
+- Selecionar treino do dia (pelo bloco de treino ativo do usuário, se houver plano atribuído)
+- Por exercício registrar: carga_kg, séries executadas, repetições executadas, observação livre
+- Calcular automaticamente: load_total por exercício, carga_total_sessao, unidades_arbitrarias
+- Ao finalizar sessão: registrar PSE (1-10), tempo_sessao_minutos
+- Campo de cadência, intervalo, método visíveis como referência (somente leitura se vier de plano)
+- Suportar exercícios livres (sem plano atribuído): usuário digita nome do exercício manualmente ou seleciona da biblioteca
+
+4) Logging de treino cardio:
+- Tipo: aeróbio contínuo, HIIT, intervalado
+- Equipamento: esteira, bicicleta ergométrica, escada ergométrica, livre
+- Métricas: distância (km/m), tempo (min), pace, FC (HR) opcional, PSE, tiros/intervalos (para HIIT/intervalado)
+- Para esteira intervalada: número de tiros, duração do tiro, velocidade de recuperação
+
+5) Progresso:
+- Métricas agregadas semanal/mensal + gráficos:
+  - Carga total levantada por sessão (linha do tempo)
+  - Volume por grupo muscular (barras)
+  - Evolução de carga por exercício específico (permite comparar microciclos)
+  - Unidades Arbitrárias ao longo do tempo
+  - PSE médio por semana
+  - Distribuição de métodos de treino utilizados
+
+6) Biblioteca de Exercícios:
+- Pré-populada com os 136 exercícios catalogados acima
+- Campos: nome, grupo_muscular, equipamento, instrucoes, metodos_sugeridos
+- Busca por nome e grupo muscular
+
+7) Planos de Treino:
+- Estrutura: Bloco (mensal) > Treinos (dias, nomeados por cor/letra) > Microciclos > Exercícios
+- Trainer ou Admin pode criar/editar planos e atribuir a usuários
+- Usuário pode registrar a sessão baseada no plano atribuído
+- Campos do exercício no plano: nome, séries, repetições, cadência, intervalo, método, observações
+- Progressão de microciclo: o sistema deve saber em qual microciclo o usuário está e sugerir o volume correto
+
+8) AI/Analytics (Python FastAPI — heurístico, sem chamadas externas):
+- Endpoint /recommendation: sugestão do próximo treino baseada em:
+  - Logs recentes (última sessão por grupo muscular)
+  - Objetivos do usuário
+  - PSE médio recente (se alto, reduzir volume; se baixo, aumentar)
+  - Ciclos de 30/60/90 dias para sugerir troca de plano
+- Endpoint /progress-summary: análise de evolução de carga, volume e PSE
+- Endpoint /load-analysis: carga total levantada por período e grupo muscular
+
+9) Personal Trainer (MVP simples):
+- Entidade trainer + especialidades + associação user↔trainer
+- Trainer pode criar planos de treino e atribuir a usuários
+
+10) Admin Geral (MVP Simples):
+- Acesso total ao sistema
+- Pode incluir/excluir dados, gerenciar usuários e trainers
+- Primeiro acesso via credencial admin segura (armazenada em Key Vault/GitHub Secrets)
+
+================================================================================
+DB SCHEMA — TABELAS OBRIGATÓRIAS (Prisma + MySQL)
+================================================================================
+Além das tabelas básicas já descritas no prompt original, adicionar:
+
+-- exercise_library: banco de exercícios (pré-populado com os 136 acima)
+  id, name, muscle_group, equipment, description, instructions, created_at
+
+-- training_methods: métodos de treino (pré-populado com os 20 métodos acima)
+  id, name, abbreviation, description, created_at
+
+-- training_blocks: planos de treino mensais/bimestrais
+  id, name, month_ref, user_id (nullable — plano template), trainer_id, created_at
+
+-- training_days: dias de treino dentro do bloco
+  id, block_id, day_name (Amarelo/Verde/etc), day_number, muscle_groups, created_at
+
+-- training_microcycles: microciclos dentro de cada dia
+  id, day_id, microcycle_number (1-4), created_at
+
+-- training_exercises: exercícios prescritos em cada microciclo
+  id, microcycle_id, exercise_library_id, series, reps, cadence, rest_seconds, method_id, observations, order_index
+
+-- workout_sessions: sessões de treino executadas
+  id, user_id, training_day_id (nullable), session_date, duration_minutes, pse, arbitrary_units (calculado), total_load_kg (calculado), notes
+
+-- workout_sets: sets executados em cada sessão
+  id, session_id, exercise_library_id (ou nome livre), training_exercise_id (nullable), set_number, reps_executed, weight_kg, load_total (calculado), notes
+
+-- cardio_sessions: sessões de cardio
+  id, user_id, session_date, cardio_type (aerobic/hiit/interval), equipment, duration_minutes, distance_km, pace, heart_rate, pse, intervals_count, interval_duration_sec, recovery_speed_kmh, notes
+
+================================================================================
+MODO DE ENTREGA (Fases e formato fixo)
+================================================================================
+Para CADA fase, responda SEMPRE com:
+(A) Objetivo da fase
+(B) Mudanças na árvore de arquivos (file tree)
+(C) Conteúdo pronto para copiar/colar (código/IaC)
+(D) Comandos exatos para executar (Azure/GitHub)
+(E) Passos de validação NO AZURE (cloud-only)
+(F) Checklist de aceitação
+
+Regra de gating: ao finalizar a fase: pare e pergunte por "go next".
+
+Sequência fixa de fases (ajustada para ACI):
+1) Repo bootstrap (sem deploy)
+2) IaC base multi-subscription (Terraform):
+   - Resource Groups (Canada Central), Key Vault, App Insights/Log Analytics
+   - Networking mínima segura (VNet/Subnets/NAT) e desenho cross-subscription
+   - ACR e RBAC para pull de imagens
+   - ACI (Node e Python) e SWA (frontend)
+   - MySQL Flexible Server com postura segura de rede
+   - Azure Policy para tags e baseline de governança
+3) DB schema + migrations:
+   - MySQL + Prisma schema + migrações + seed obrigatório (biblioteca de exercícios + métodos de treino)
+   - Seed com os 136 exercícios e 20 métodos listados acima
+   - Tabelas: users, auth_identities, anamnesis, goals, workout_sessions, workout_sets, cardio_sessions, exercise_library, training_methods, training_blocks, training_days, training_microcycles, training_exercises, trainers, trainer_specialties, user_trainer_association, metrics
+4) Backend Node API (Express + TS):
+   - CRUD endpoints para todos os recursos acima
+   - Autenticação OAuth2/OIDC skeleton
+   - Cálculo automático de load_total, total_load_kg, arbitrary_units
+   - Health check /health + OpenAPI spec
+5) Python FastAPI (ACI):
+   - /health + /recommendation + /progress-summary + /load-analysis
+   - Algoritmo heurístico baseado nos campos PSE, volume, grupo muscular e objetivos
+6) Frontend React (SWA):
+   - Telas: Dashboard, Log Workout (Musculação), Log Cardio, Progress (com gráficos), Biblioteca de Exercícios, Planos de Treino, Profile/Goals
+   - PWA basics
+7) CI/CD:
+   - Build/test/publish containers (Node e Python)
+   - Deploy ACI + SWA via GitHub Actions com OIDC
+8) Hardening:
+   - Key Vault references, CORS/rate limiting, observabilidade, logs, threat notes
+
+================================================================================
+EXECUÇÃO EM PARALELO (workstreams para rodar em paralelo)
+================================================================================
+Workstream 1 — GitHub/Repo: gh repo, estrutura, configs, actions skeleton
+Workstream 2 — Terraform/IaC: módulos, providers para 3 subscriptions, state, outputs
+Workstream 3 — Identidade & Segurança: OIDC, Managed Identity, RBAC, Key Vault
+Workstream 4 — Observabilidade: App Insights/Log Analytics, dashboards, alertas
+Workstream 5 — Networking: VNet/Subnets, NAT/egress, firewall MySQL
+Workstream 6 — Containers: Dockerfiles, build pipeline, deploy ACI, health checks
+
+================================================================================
+ROADMAP (não implementar agora — apenas preparar arquitetura)
+================================================================================
+- Biblioteca de exercícios com vídeos demonstrativos
+- Gamificação: rankings, desafios, conquistas por volume/frequência
+- Comunidade: feed de treinos, curtidas, comentários
+- Integrações: wearables (Garmin, Apple Watch), nutrição, música (Spotify)
+- Assistente virtual com persona IA avançada (Azure OpenAI)
+- Ciclos de periodização automáticos (linear, ondulatória, conjugada)
+- Relatórios de performance exportáveis (PDF/Excel)
+- Multi-language (PT-BR + EN)
+
+================================================================================
+AGORA (o que fazer imediatamente)
+================================================================================
+Não criar nada ainda. Apenas:
+- Confirmar que entendeu as restrições (Canada Central, ACI, mesma AZ, 3 subscriptions, domínio de musculação)
+- Confirmar que entendeu o modelo de dados (136 exercícios, 20 métodos, estrutura bloco→dia→microciclo→exercício)
+- Apontar riscos técnicos previsíveis sem inventar capacidades
+- Listar quais informações NÃO-secretas você precisará quando eu der "go next"
+E então parar e aguardar meu próximo prompt.

@@ -1,0 +1,14 @@
+.git
+.github
+.vscode
+.copilot
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+**/.cache
+infra/.terraform
+infra/**/.terraform
+*.xlsx
+*.log
+coverage

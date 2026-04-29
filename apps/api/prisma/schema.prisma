@@ -1,0 +1,414 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  TRAINER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  MICROSOFT
+  FACEBOOK
+}
+
+enum TrainingLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum GoalType {
+  HYPERTROPHY
+  STRENGTH
+  WEIGHT_LOSS
+  RUN_5K
+  RUN_10K
+  RUN_21K
+  RUN_42K
+  OTHER
+}
+
+enum SessionSourceType {
+  PLAN
+  CUSTOM
+}
+
+enum CardioType {
+  AEROBIC_CONTINUOUS
+  AEROBIC_LONG
+  HIIT_LONG
+  INTERVAL_TREADMILL
+  OTHER
+}
+
+enum AssociationStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+model User {
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
+  fullName           String
+  role               UserRole                 @default(STUDENT)
+  status             UserStatus               @default(ACTIVE)
+  passwordHash       String?
+  mustChangePassword Boolean                  @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  deletedAt          DateTime?
+  authIdentities     AuthIdentity[]
+  anamneses          Anamnesis[]
+  goals              Goal[]
+  workoutSessions    WorkoutSession[]
+  runningSessions    RunningSession[]
+  cardioSessions     CardioSession[]
+  metrics            Metric[]
+  trainerProfile     TrainerProfile?
+  assignedBlocks     TrainingBlock[]          @relation("AssignedTrainingBlocks")
+  createdBlocks      TrainingBlock[]          @relation("TrainerCreatedTrainingBlocks")
+  studentLinks       UserTrainerAssociation[] @relation("StudentAssociation")
+  trainerLinks       UserTrainerAssociation[] @relation("TrainerAssociation")
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model AuthIdentity {
+  id             String       @id @default(cuid())
+  userId         String
+  provider       AuthProvider
+  providerUserId String?
+  passwordHash   String?
+  isPrimary      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("auth_identities")
+}
+
+model Anamnesis {
+  id            String         @id @default(cuid())
+  userId        String
+  trainingLevel TrainingLevel?
+  age           Int?
+  heightCm      Decimal?       @db.Decimal(5, 2)
+  weightKg      Decimal?       @db.Decimal(6, 2)
+  bodyFatPct    Decimal?       @db.Decimal(5, 2)
+  injuries      String?        @db.Text
+  limitations   String?        @db.Text
+  medicalNotes  String?        @db.Text
+  isCurrent     Boolean        @default(true)
+  recordedAt    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isCurrent])
+  @@map("anamnesis")
+}
+
+model Goal {
+  id          String    @id @default(cuid())
+  userId      String
+  type        GoalType
+  description String?   @db.Text
+  targetValue Decimal?  @db.Decimal(10, 2)
+  targetDate  DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@map("goals")
+}
+
+model TrainerProfile {
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  bio             String?            @db.Text
+  certification   String?
+  experienceYears Int?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialties     TrainerSpecialty[]
+
+  @@map("trainers")
+}
+
+model TrainerSpecialty {
+  id               String         @id @default(cuid())
+  trainerProfileId String
+  name             String
+  description      String?        @db.Text
+  createdAt        DateTime       @default(now())
+  trainerProfile   TrainerProfile @relation(fields: [trainerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([trainerProfileId, name])
+  @@map("trainer_specialties")
+}
+
+model UserTrainerAssociation {
+  id            String            @id @default(cuid())
+  studentUserId String
+  trainerUserId String
+  status        AssociationStatus @default(ACTIVE)
+  startDate     DateTime          @default(now())
+  endDate       DateTime?
+  notes         String?           @db.Text
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  student       User              @relation("StudentAssociation", fields: [studentUserId], references: [id], onDelete: Cascade)
+  trainer       User              @relation("TrainerAssociation", fields: [trainerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([studentUserId, trainerUserId])
+  @@index([studentUserId, status])
+  @@index([trainerUserId, status])
+  @@map("user_trainer_association")
+}
+
+model TrainingMethod {
+  id                String                  @id @default(cuid())
+  name              String                  @unique
+  abbreviation      String?                 @unique
+  description       String                  @db.Text
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  trainingExercises TrainingExercise[]
+  exerciseMethods   ExerciseLibraryMethod[]
+
+  @@map("training_methods")
+}
+
+model ExerciseLibrary {
+  id                String                  @id @default(cuid())
+  name              String                  @unique
+  muscleGroup       String
+  equipment         String?
+  description       String?                 @db.Text
+  instructions      String?                 @db.Text
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  trainingExercises TrainingExercise[]
+  workoutSets       WorkoutSet[]
+  methodLinks       ExerciseLibraryMethod[]
+
+  @@index([muscleGroup])
+  @@map("exercise_library")
+}
+
+model ExerciseLibraryMethod {
+  exerciseLibraryId String
+  trainingMethodId  String
+  createdAt         DateTime        @default(now())
+  exerciseLibrary   ExerciseLibrary @relation(fields: [exerciseLibraryId], references: [id], onDelete: Cascade)
+  trainingMethod    TrainingMethod  @relation(fields: [trainingMethodId], references: [id], onDelete: Cascade)
+
+  @@id([exerciseLibraryId, trainingMethodId])
+  @@map("exercise_library_methods")
+}
+
+model TrainingBlock {
+  id             String        @id @default(cuid())
+  name           String
+  monthRef       String?
+  assignedUserId String?
+  trainerUserId  String?
+  isTemplate     Boolean       @default(false)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  assignedUser   User?         @relation("AssignedTrainingBlocks", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  trainerUser    User?         @relation("TrainerCreatedTrainingBlocks", fields: [trainerUserId], references: [id], onDelete: SetNull)
+  trainingDays   TrainingDay[]
+
+  @@index([assignedUserId, isActive])
+  @@index([trainerUserId])
+  @@map("training_blocks")
+}
+
+model TrainingDay {
+  id              String               @id @default(cuid())
+  blockId         String
+  dayName         String
+  dayNumber       Int
+  muscleGroups    String               @db.Text
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  block           TrainingBlock        @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  microcycles     TrainingMicrocycle[]
+  workoutSessions WorkoutSession[]
+
+  @@unique([blockId, dayNumber])
+  @@map("training_days")
+}
+
+model TrainingMicrocycle {
+  id               String             @id @default(cuid())
+  dayId            String
+  microcycleNumber Int
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  day              TrainingDay        @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  exercises        TrainingExercise[]
+
+  @@unique([dayId, microcycleNumber])
+  @@map("training_microcycles")
+}
+
+model TrainingExercise {
+  id                String             @id @default(cuid())
+  microcycleId      String
+  exerciseLibraryId String
+  trainingMethodId  String?
+  series            Int
+  reps              Int
+  cadence           String?
+  restSeconds       Int?
+  observations      String?            @db.Text
+  orderIndex        Int
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  microcycle        TrainingMicrocycle @relation(fields: [microcycleId], references: [id], onDelete: Cascade)
+  exerciseLibrary   ExerciseLibrary    @relation(fields: [exerciseLibraryId], references: [id], onDelete: Restrict)
+  trainingMethod    TrainingMethod?    @relation(fields: [trainingMethodId], references: [id], onDelete: SetNull)
+  workoutSets       WorkoutSet[]
+
+  @@unique([microcycleId, orderIndex])
+  @@index([exerciseLibraryId])
+  @@index([trainingMethodId])
+  @@map("training_exercises")
+}
+
+model WorkoutSession {
+  id              String            @id @default(cuid())
+  userId          String
+  trainingDayId   String?
+  sourceType      SessionSourceType @default(PLAN)
+  sessionDate     DateTime          @default(now())
+  durationMinutes Int?
+  pse             Int?
+  arbitraryUnits  Decimal?          @db.Decimal(10, 2)
+  totalLoadKg     Decimal?          @db.Decimal(14, 2)
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingDay     TrainingDay?      @relation(fields: [trainingDayId], references: [id], onDelete: SetNull)
+  workoutSets     WorkoutSet[]
+  metrics         Metric[]
+
+  @@index([userId, sessionDate])
+  @@index([trainingDayId])
+  @@map("workout_sessions")
+}
+
+model WorkoutSet {
+  id                 String            @id @default(cuid())
+  workoutSessionId   String
+  exerciseLibraryId  String?
+  trainingExerciseId String?
+  setNumber          Int
+  repsExecuted       Int
+  weightKg           Decimal?          @db.Decimal(10, 2)
+  loadTotal          Decimal?          @db.Decimal(12, 2)
+  notes              String?           @db.Text
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  workoutSession     WorkoutSession    @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exerciseLibrary    ExerciseLibrary?  @relation(fields: [exerciseLibraryId], references: [id], onDelete: SetNull)
+  trainingExercise   TrainingExercise? @relation(fields: [trainingExerciseId], references: [id], onDelete: SetNull)
+
+  @@index([workoutSessionId])
+  @@index([exerciseLibraryId])
+  @@index([trainingExerciseId])
+  @@map("workout_sets")
+}
+
+model RunningSession {
+  id              String   @id @default(cuid())
+  userId          String
+  sessionDate     DateTime @default(now())
+  distanceKm      Decimal? @db.Decimal(7, 2)
+  durationMinutes Int?
+  pace            String?
+  avgHeartRate    Int?
+  pse             Int?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metrics         Metric[]
+
+  @@index([userId, sessionDate])
+  @@map("running_sessions")
+}
+
+model CardioSession {
+  id                  String     @id @default(cuid())
+  userId              String
+  sessionDate         DateTime   @default(now())
+  cardioType          CardioType
+  equipment           String?
+  intensity           String?
+  durationMinutes     Int?
+  distanceKm          Decimal?   @db.Decimal(7, 2)
+  pace                String?
+  heartRate           Int?
+  pse                 Int?
+  intervalsCount      Int?
+  intervalDurationSec Int?
+  recoverySpeedKmh    Decimal?   @db.Decimal(6, 2)
+  notes               String?    @db.Text
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionDate])
+  @@map("cardio_sessions")
+}
+
+model Metric {
+  id                 String          @id @default(cuid())
+  userId             String
+  workoutSessionId   String?
+  runningSessionId   String?
+  weekStart          DateTime?
+  monthRef           String?
+  avgPse             Decimal?        @db.Decimal(6, 2)
+  totalLoadKg        Decimal?        @db.Decimal(14, 2)
+  totalCardioMinutes Int?
+  totalDistanceKm    Decimal?        @db.Decimal(10, 2)
+  notes              String?         @db.Text
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutSession     WorkoutSession? @relation(fields: [workoutSessionId], references: [id], onDelete: SetNull)
+  runningSession     RunningSession? @relation(fields: [runningSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, weekStart, monthRef])
+  @@map("metrics")
+}

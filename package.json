@@ -1,0 +1,21 @@
+{
+  "name": "trainmate",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TrainMate monorepo bootstrap (frontend, api, ai, infra)",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "apps/frontend",
+    "apps/api"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:frontend": "npm run dev -w apps/frontend",
+    "dev:api": "npm run dev -w apps/api"
+  }
+}
+
