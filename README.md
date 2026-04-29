@@ -99,6 +99,44 @@ Workflows:
 3. Grant least-privilege RBAC to each service principal in its subscription/resource groups.
 4. Save the corresponding client IDs and subscription IDs as repository variables listed above.
 
+### Automated OIDC bootstrap
+
+If `Microsoft Entra ID -> App registrations` is empty, use the bootstrap script to create the required
+app registrations, service principals, GitHub OIDC federated credentials, RBAC assignments, and all CD
+repository variables in one run.
+
+Prerequisites:
+
+1. `az login` authenticated with an account that can create app registrations and role assignments.
+2. `gh auth login` authenticated with admin/write access to this repository.
+3. Infrastructure already created (resource groups + ACR + SWA), so names can be discovered.
+
+Run:
+
+```powershell
+.\scripts\azure\bootstrap-cd-oidc.ps1
+```
+
+Optional explicit overrides:
+
+```powershell
+.\scripts\azure\bootstrap-cd-oidc.ps1 `
+  -Repository "fabiobo2005/awesome_trainMate" `
+  -TenantId "<tenant-guid>" `
+  -FrontendSubscriptionId "<sub-guid>" `
+  -BackendSubscriptionId "<sub-guid>" `
+  -DataAiSubscriptionId "<sub-guid>" `
+  -AcrName "<acr-name>" `
+  -SwaName "<swa-name>" `
+  -FrontendApiBaseUrl "https://api.trainmate.local"
+```
+
+Safe rehearsal mode:
+
+```powershell
+.\scripts\azure\bootstrap-cd-oidc.ps1 -DryRun
+```
+
 ## Security hardening (Phase 8)
 
 ### Implemented controls
