@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   List,
   ListItem,
@@ -17,23 +16,24 @@ import {
 import Grid from "@mui/material/Grid2";
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest, extractErrorMessage } from "../api/client";
-import type { AiLoadAnalysis, AiProgressSummary, AiRecommendation, ProgressSummary } from "../types/domain";
+import type {
+  AiLoadAnalysis,
+  AiRecommendation,
+  ProgressSummary,
+  RunningSession,
+  WorkoutSession
+} from "../types/domain";
 import { formatNumber } from "../utils/format";
 
 type DashboardScreenProps = {
   token: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  "on-track": "No alvo",
-  watch: "Atenção",
-  "at-risk": "Em risco",
-  "off-track": "Fora do alvo",
-  behind: "Atrasado"
-};
-
-function translateStatus(status: string): string {
-  return STATUS_LABELS[status] ?? status;
+function formatSessionDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 const RECOVERY_LABELS: Record<string, string> = {
@@ -51,9 +51,10 @@ function translateRecovery(priority: string): string {
 export function DashboardScreen({ token }: DashboardScreenProps) {
   const [periodDays, setPeriodDays] = useState(30);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
-  const [aiSummary, setAiSummary] = useState<AiProgressSummary | null>(null);
   const [recommendation, setRecommendation] = useState<AiRecommendation | null>(null);
   const [loadAnalysis, setLoadAnalysis] = useState<AiLoadAnalysis | null>(null);
+  const [lastWorkout, setLastWorkout] = useState<WorkoutSession | null>(null);
+  const [lastRun, setLastRun] = useState<RunningSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -61,32 +62,31 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [summaryResponse, aiSummaryResponse, recommendationResponse, loadAnalysisResponse] = await Promise.all([
-        apiRequest<ProgressSummary>("/api/progress/summary", {
-          token,
-          query: { days: periodDays }
-        }),
-        apiRequest<AiProgressSummary>("/api/ai/progress-summary", {
-          method: "POST",
-          token,
-          body: { periodDays }
-        }),
-        apiRequest<AiRecommendation>("/api/ai/recommendation", {
-          method: "POST",
-          token,
-          body: {}
-        }),
-        apiRequest<AiLoadAnalysis>("/api/ai/load-analysis", {
-          method: "POST",
-          token,
-          body: { periodDays }
-        })
-      ]);
+      const [summaryResponse, recommendationResponse, loadAnalysisResponse, workoutSessions, runSessions] =
+        await Promise.all([
+          apiRequest<ProgressSummary>("/api/progress/summary", {
+            token,
+            query: { days: periodDays }
+          }),
+          apiRequest<AiRecommendation>("/api/ai/recommendation", {
+            method: "POST",
+            token,
+            body: {}
+          }),
+          apiRequest<AiLoadAnalysis>("/api/ai/load-analysis", {
+            method: "POST",
+            token,
+            body: { periodDays }
+          }),
+          apiRequest<WorkoutSession[]>("/api/workouts/sessions", { token }),
+          apiRequest<RunningSession[]>("/api/runs/sessions", { token })
+        ]);
 
       setSummary(summaryResponse);
-      setAiSummary(aiSummaryResponse);
       setRecommendation(recommendationResponse);
       setLoadAnalysis(loadAnalysisResponse);
+      setLastWorkout(workoutSessions[0] ?? null);
+      setLastRun(runSessions[0] ?? null);
     } catch (error) {
       setErrorMessage(extractErrorMessage(error, "Falha ao carregar o painel."));
     } finally {
@@ -147,39 +147,69 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
 
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
-      {summary ? (
-        <Grid container spacing={2}>
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary">
+                Última sessão de musculação
+              </Typography>
+              {lastWorkout ? (
+                <>
+                  <Typography variant="h5" sx={{ mt: 0.5 }}>
+                    {formatSessionDate(lastWorkout.sessionDate)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Carga total: {formatNumber(lastWorkout.totalLoadKg, 1)} kg
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Séries: {lastWorkout.workoutSets?.length ?? 0}
+                    {lastWorkout.durationMinutes ? ` • ${lastWorkout.durationMinutes} min` : ""}
+                    {lastWorkout.pse ? ` • PSE ${lastWorkout.pse}` : ""}
+                  </Typography>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Nenhuma sessão registrada.
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
+            <CardContent>
+              <Typography variant="subtitle2" color="text.secondary">
+                Última sessão de cardio
+              </Typography>
+              {lastRun ? (
+                <>
+                  <Typography variant="h5" sx={{ mt: 0.5 }}>
+                    {formatSessionDate(lastRun.sessionDate)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Distância: {formatNumber(lastRun.distanceKm, 2)} km
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {lastRun.durationMinutes ? `${lastRun.durationMinutes} min` : "—"}
+                    {lastRun.pace ? ` • Pace ${lastRun.pace}` : ""}
+                    {lastRun.avgHeartRate ? ` • FC ${lastRun.avgHeartRate} bpm` : ""}
+                  </Typography>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Nenhuma sessão registrada.
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        {summary ? (
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ height: "100%" }}>
               <CardContent>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Sessões de musculação
-                </Typography>
-                <Typography variant="h4">{summary.workouts.sessions}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Carga total: {formatNumber(summary.workouts.totalLoadKg, 1)} kg
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Sessões de cardio
-                </Typography>
-                <Typography variant="h4">{summary.runs.sessions}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Distância total: {formatNumber(summary.runs.totalDistanceKm, 2)} km
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Registros de métricas
+                  Registros de métricas no período
                 </Typography>
                 <Typography variant="h4">{summary.metrics.entries}</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -188,8 +218,8 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
               </CardContent>
             </Card>
           </Grid>
-        </Grid>
-      ) : null}
+        ) : null}
+      </Grid>
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
@@ -255,64 +285,6 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
           </Card>
         </Grid>
       </Grid>
-
-      {aiSummary ? (
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={1}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="h6">Status inteligente</Typography>
-                <Chip
-                  size="small"
-                  color={
-                    aiSummary.summary.status === "on-track"
-                      ? "success"
-                      : aiSummary.summary.status === "watch"
-                        ? "warning"
-                        : "error"
-                  }
-                  label={translateStatus(aiSummary.summary.status)}
-                />
-              </Stack>
-              <Typography variant="body2">
-                Aderência estimada: <strong>{formatNumber(aiSummary.summary.adherence_rate, 1)}%</strong>
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <Typography variant="subtitle2">Destaques</Typography>
-                  <List dense disablePadding>
-                    {aiSummary.summary.highlights.map((item) => (
-                      <ListItem key={item} sx={{ py: 0 }}>
-                        <ListItemText primary={item} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <Typography variant="subtitle2">Riscos</Typography>
-                  <List dense disablePadding>
-                    {aiSummary.summary.risks.map((risk) => (
-                      <ListItem key={risk} sx={{ py: 0 }}>
-                        <ListItemText primary={risk} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <Typography variant="subtitle2">Ações sugeridas</Typography>
-                  <List dense disablePadding>
-                    {aiSummary.summary.recommended_actions.map((item) => (
-                      <ListItem key={item} sx={{ py: 0 }}>
-                        <ListItemText primary={item} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Grid>
-              </Grid>
-            </Stack>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <Grid container spacing={2}>
         {recommendation ? (
