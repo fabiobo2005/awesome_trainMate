@@ -18,11 +18,10 @@ import { DashboardScreen } from "./screens/dashboard-screen";
 import { ExerciseLibraryScreen } from "./screens/exercise-library-screen";
 import { LoginScreen } from "./screens/login-screen";
 import { ProfileGoalsScreen } from "./screens/profile-goals-screen";
-import { ProgressScreen } from "./screens/progress-screen";
 import { TrainingPlansScreen } from "./screens/training-plans-screen";
 import { WorkoutLogScreen } from "./screens/workout-log-screen";
 
-type ScreenTab = "dashboard" | "workout" | "cardio" | "progress" | "library" | "plans" | "profile" | "admin";
+type ScreenTab = "dashboard" | "workout" | "cardio" | "library" | "plans" | "profile" | "admin";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrador",
@@ -40,7 +39,6 @@ const baseTabs: Array<{ value: ScreenTab; label: string }> = [
   { value: "dashboard", label: "Painel" },
   { value: "workout", label: "Treino" },
   { value: "cardio", label: "Cardio" },
-  { value: "progress", label: "Progresso" },
   { value: "library", label: "Biblioteca" },
   { value: "plans", label: "Planos" },
   { value: "profile", label: "Perfil/Metas" }
@@ -69,8 +67,6 @@ function AuthenticatedApp() {
         return <WorkoutLogScreen token={session.accessToken} />;
       case "cardio":
         return <CardioLogScreen token={session.accessToken} />;
-      case "progress":
-        return <ProgressScreen token={session.accessToken} />;
       case "library":
         return <ExerciseLibraryScreen token={session.accessToken} />;
       case "plans":
