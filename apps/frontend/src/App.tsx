@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useMemo, useState } from "react";
 import { AuthSessionProvider, useAuthSession } from "./auth/session";
+import { AdminScreen } from "./screens/admin-screen";
 import { CardioLogScreen } from "./screens/cardio-log-screen";
 import { DashboardScreen } from "./screens/dashboard-screen";
 import { ExerciseLibraryScreen } from "./screens/exercise-library-screen";
@@ -21,7 +22,7 @@ import { ProgressScreen } from "./screens/progress-screen";
 import { TrainingPlansScreen } from "./screens/training-plans-screen";
 import { WorkoutLogScreen } from "./screens/workout-log-screen";
 
-type ScreenTab = "dashboard" | "workout" | "cardio" | "progress" | "library" | "plans" | "profile";
+type ScreenTab = "dashboard" | "workout" | "cardio" | "progress" | "library" | "plans" | "profile" | "admin";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrador",
@@ -35,7 +36,7 @@ function translateRole(role: string | null | undefined): string {
   return ROLE_LABELS[role] ?? role;
 }
 
-const tabs: Array<{ value: ScreenTab; label: string }> = [
+const baseTabs: Array<{ value: ScreenTab; label: string }> = [
   { value: "dashboard", label: "Painel" },
   { value: "workout", label: "Treino" },
   { value: "cardio", label: "Cardio" },
@@ -45,9 +46,18 @@ const tabs: Array<{ value: ScreenTab; label: string }> = [
   { value: "profile", label: "Perfil/Metas" }
 ];
 
+const adminTab: { value: ScreenTab; label: string } = { value: "admin", label: "Admin · BD" };
+
 function AuthenticatedApp() {
   const { session, isLoading, errorMessage, login, logout, clearError, updateUser } = useAuthSession();
   const [activeTab, setActiveTab] = useState<ScreenTab>("dashboard");
+
+  const tabs = useMemo<Array<{ value: ScreenTab; label: string }>>(() => {
+    if (session?.user.role === "ADMIN") {
+      return [...baseTabs, adminTab];
+    }
+    return baseTabs;
+  }, [session?.user.role]);
 
   const activeScreen = useMemo(() => {
     if (!session) return null;
@@ -67,6 +77,9 @@ function AuthenticatedApp() {
         return <TrainingPlansScreen token={session.accessToken} />;
       case "profile":
         return <ProfileGoalsScreen token={session.accessToken} onUserRefresh={(user) => updateUser(user)} />;
+      case "admin":
+        if (session.user.role !== "ADMIN") return null;
+        return <AdminScreen token={session.accessToken} />;
       default:
         return null;
     }

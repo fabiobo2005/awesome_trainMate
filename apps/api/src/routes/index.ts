@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { adminRouter } from "./admin.js";
 import { aiRouter } from "./ai.js";
 import { authRouter } from "./auth.js";
 import { catalogRouter } from "./catalog.js";
@@ -18,4 +19,5 @@ apiRouter.use("/profile", profileRouter);
 apiRouter.use("/workouts", workoutsRouter);
 apiRouter.use("/runs", runsRouter);
 apiRouter.use("/progress", progressRouter);
+apiRouter.use("/admin", adminRouter);
 
