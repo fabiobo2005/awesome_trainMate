@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: trainmate
+metadata:
+  template: trainmate@1.0.0
+
+services:
+  api:
+    project: ./apps/api
+    language: ts
+    host: containerapp
+    docker:
+      path: Dockerfile
+      context: ../..
+  ai:
+    project: ./apps/ai
+    language: python
+    host: containerapp
+    docker:
+      path: Dockerfile
+      context: ../..
+  web:
+    project: ./apps/frontend
+    language: ts
+    host: staticwebapp
+    dist: dist
+
+hooks:
+  predeploy:
+    windows:
+      shell: pwsh
+      run: |
+        if ($env:AZURE_API_BASE_URL) {
+          Set-Content -Path apps/frontend/.env.production -Value "VITE_API_BASE_URL=$env:AZURE_API_BASE_URL"
+        }
+    posix:
+      shell: sh
+      run: |
+        if [ -n "$AZURE_API_BASE_URL" ]; then
+          echo "VITE_API_BASE_URL=$AZURE_API_BASE_URL" > apps/frontend/.env.production
+        fi

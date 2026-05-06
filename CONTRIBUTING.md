@@ -24,9 +24,8 @@ python -m compileall apps/ai/app
 For infrastructure changes:
 
 ```powershell
-cd infra\envs\dev
-terraform fmt -recursive
-terraform validate
+az bicep build --file infra\main.bicep
+azd provision --preview
 ```
 
 ## Pull request quality guidelines

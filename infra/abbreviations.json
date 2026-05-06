@@ -1,0 +1,16 @@
+{
+  "analysisServicesServers": "as",
+  "apiManagementService": "apim-",
+  "appConfigurationStores": "appcs-",
+  "appManagedEnvironments": "cae-",
+  "appContainerApps": "ca-",
+  "containerRegistryRegistries": "cr",
+  "documentDBDatabaseAccounts": "cosmos-",
+  "insightsComponents": "appi-",
+  "keyVaultVaults": "kv-",
+  "operationalInsightsWorkspaces": "log-",
+  "resourcesResourceGroups": "rg-",
+  "staticWebApp": "stapp-",
+  "dbForMySqlFlexibleServers": "mysql-",
+  "managedIdentityUserAssignedIdentities": "id-"
+}
