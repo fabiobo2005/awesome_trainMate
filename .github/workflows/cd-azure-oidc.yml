@@ -9,6 +9,10 @@ on:
         description: azd environment name
         type: string
         default: dev
+      runDbSeed:
+        description: Run prisma db seed on container start
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,10 +64,12 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           AZURE_PRINCIPAL_ID: ${{ vars.AZURE_PRINCIPAL_ID }}
+          RUN_DB_SEED: ${{ github.event.inputs.runDbSeed || 'false' }}
         run: |
           azd env new "$AZURE_ENV_NAME" --location "$AZURE_LOCATION" --subscription "$AZURE_SUBSCRIPTION_ID" --no-prompt || \
             azd env select "$AZURE_ENV_NAME"
           azd env set AZURE_PRINCIPAL_ID "$AZURE_PRINCIPAL_ID"
+          azd env set RUN_DB_SEED "$RUN_DB_SEED"
 
       - name: Provision (Bicep)
         run: azd provision --no-prompt

@@ -9,6 +9,8 @@ param mysqlAdministratorLogin string
 param mysqlAdministratorPassword string
 @secure()
 param jwtSecret string
+@description('Set to "true" to run prisma db seed on container start. Use only on first deploy or when reseeding.')
+param runDbSeed string = 'false'
 
 var apiPort = 8080
 var aiPort = 8090
@@ -43,7 +45,7 @@ module mysql 'core/mysql.bicep' = {
   }
 }
 
-var databaseUrl = 'mysql://${mysqlAdministratorLogin}:${uriComponent(mysqlAdministratorPassword)}@${mysql.outputs.fqdn}:3306/${mysql.outputs.databaseName}?ssl-mode=REQUIRED'
+var databaseUrl = 'mysql://${mysqlAdministratorLogin}:${uriComponent(mysqlAdministratorPassword)}@${mysql.outputs.fqdn}:3306/${mysql.outputs.databaseName}?sslaccept=accept_invalid_certs'
 
 module cae 'core/containerapps-environment.bicep' = {
   name: 'cae'
@@ -88,7 +90,7 @@ module apiApp 'core/containerapp.bicep' = {
     targetPort: apiPort
     external: true
     minReplicas: 1
-    maxReplicas: 3
+    maxReplicas: 1
     cpu: '0.5'
     memory: '1Gi'
     secrets: [
@@ -102,8 +104,9 @@ module apiApp 'core/containerapp.bicep' = {
       { name: 'DATABASE_URL', secretRef: 'database-url' }
       { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
       { name: 'AI_SERVICE_BASE_URL', value: aiApp.outputs.uri }
-      { name: 'CORS_ORIGINS', value: 'https://*.azurestaticapps.net,http://localhost:5173' }
+      { name: 'CORS_ORIGINS', value: 'https://${web.outputs.hostname},https://*.azurestaticapps.net,http://localhost:5173' }
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: monitoring.outputs.applicationInsightsConnectionString }
+      { name: 'RUN_DB_SEED', value: runDbSeed }
     ]
   }
 }

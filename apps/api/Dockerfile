@@ -23,7 +23,13 @@ COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /workspace/apps/api/dist ./apps/api/dist
 COPY --from=builder /workspace/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /workspace/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
+COPY --from=builder /workspace/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
+COPY --from=builder /workspace/*.xlsx ./
+
+RUN chmod +x ./apps/api/docker-entrypoint.sh
 
 EXPOSE 8080
 
-CMD ["node", "apps/api/dist/index.js"]
+ENTRYPOINT ["/workspace/apps/api/docker-entrypoint.sh"]
+
