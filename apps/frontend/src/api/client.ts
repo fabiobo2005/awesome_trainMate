@@ -62,14 +62,14 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     const errorMessage =
       typeof payload === "object" && payload !== null && "message" in payload
         ? String(payload.message)
-        : `Request failed with status ${response.status}`;
+        : `Falha na requisição (status ${response.status}).`;
     throw new ApiError(errorMessage, response.status, payload);
   }
 
   return payload as T;
 }
 
-export function extractErrorMessage(error: unknown, fallback = "Unexpected request error."): string {
+export function extractErrorMessage(error: unknown, fallback = "Erro inesperado na requisição."): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error && error.message) return error.message;
   return fallback;

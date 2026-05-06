@@ -157,7 +157,7 @@ export function WorkoutLogScreen({ token }: WorkoutLogScreenProps) {
     <Stack spacing={2.5}>
       <Box>
         <Typography variant="h5" fontWeight={700}>
-          Log Workout (Musculação)
+          Treino (Musculação)
         </Typography>
         <Typography color="text.secondary">Registre séries, repetições, carga e PSE para cálculo automático de carga total e UA.</Typography>
       </Box>

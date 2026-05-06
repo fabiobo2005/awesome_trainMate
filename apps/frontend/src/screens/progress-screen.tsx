@@ -23,6 +23,18 @@ type ProgressScreenProps = {
   token: string;
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  "on-track": "No alvo",
+  watch: "Atenção",
+  "at-risk": "Em risco",
+  "off-track": "Fora do alvo",
+  behind: "Atrasado"
+};
+
+function translateStatus(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
 export function ProgressScreen({ token }: ProgressScreenProps) {
   const [periodDays, setPeriodDays] = useState(30);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
@@ -90,7 +102,7 @@ export function ProgressScreen({ token }: ProgressScreenProps) {
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Box>
           <Typography variant="h5" fontWeight={700}>
-            Progress (com gráficos)
+            Progresso (com gráficos)
           </Typography>
           <Typography color="text.secondary">Acompanhe volume, aderência e distribuição de carga por grupamento muscular.</Typography>
         </Box>
@@ -210,7 +222,7 @@ export function ProgressScreen({ token }: ProgressScreenProps) {
               Leitura de progresso por IA
             </Typography>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Status: <strong>{aiSummary.summary.status}</strong> • Aderência:{" "}
+              Status: <strong>{translateStatus(aiSummary.summary.status)}</strong> • Aderência:{" "}
               <strong>{formatNumber(aiSummary.summary.adherence_rate, 1)}%</strong>
             </Typography>
             <Typography variant="subtitle2">Riscos</Typography>

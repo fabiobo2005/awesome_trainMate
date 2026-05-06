@@ -98,7 +98,7 @@ export function CardioLogScreen({ token }: CardioLogScreenProps) {
     <Stack spacing={2.5}>
       <Box>
         <Typography variant="h5" fontWeight={700}>
-          Log Cardio
+          Treino de Cardio
         </Typography>
         <Typography color="text.secondary">Registre distância, duração, pace, frequência cardíaca e PSE.</Typography>
       </Box>

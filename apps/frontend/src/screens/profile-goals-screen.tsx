@@ -37,6 +37,44 @@ const goalTypes = [
   "OTHER"
 ] as const;
 
+const GOAL_TYPE_LABELS: Record<(typeof goalTypes)[number], string> = {
+  HYPERTROPHY: "Hipertrofia",
+  STRENGTH: "Força",
+  WEIGHT_LOSS: "Emagrecimento",
+  RUN_5K: "Corrida 5 km",
+  RUN_10K: "Corrida 10 km",
+  RUN_21K: "Corrida 21 km",
+  RUN_42K: "Corrida 42 km",
+  OTHER: "Outro"
+};
+
+const TRAINING_LEVEL_LABELS: Record<string, string> = {
+  BEGINNER: "Iniciante",
+  INTERMEDIATE: "Intermediário",
+  ADVANCED: "Avançado"
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Administrador",
+  TRAINER: "Treinador",
+  ATHLETE: "Aluno",
+  STUDENT: "Aluno"
+};
+
+function translateGoalType(value: string): string {
+  return GOAL_TYPE_LABELS[value as (typeof goalTypes)[number]] ?? value;
+}
+
+function translateTrainingLevel(value: string | null | undefined): string {
+  if (!value) return "-";
+  return TRAINING_LEVEL_LABELS[value] ?? value;
+}
+
+function translateRole(value: string | null | undefined): string {
+  if (!value) return "";
+  return ROLE_LABELS[value] ?? value;
+}
+
 export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenProps) {
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -189,7 +227,7 @@ export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenP
     <Stack spacing={2.5}>
       <Box>
         <Typography variant="h5" fontWeight={700}>
-          Profile / Goals
+          Perfil / Metas
         </Typography>
         <Typography color="text.secondary">Gerencie perfil, metas de performance e anamnese atual.</Typography>
       </Box>
@@ -207,7 +245,7 @@ export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenP
                 <Stack spacing={1.5}>
                   <TextField label="Nome completo" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
                   <TextField label="E-mail" value={profile?.email ?? ""} disabled />
-                  <TextField label="Perfil de acesso" value={profile?.role ?? ""} disabled />
+                  <TextField label="Perfil de acesso" value={translateRole(profile?.role)} disabled />
                   <Button type="submit" variant="contained" disabled={isSubmitting}>
                     Salvar perfil
                   </Button>
@@ -228,7 +266,7 @@ export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenP
                   <TextField select label="Tipo de meta" value={goalType} onChange={(event) => setGoalType(event.target.value as (typeof goalTypes)[number])}>
                     {goalTypes.map((type) => (
                       <MenuItem key={type} value={type}>
-                        {type}
+                        {GOAL_TYPE_LABELS[type]}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -275,9 +313,9 @@ export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenP
             <Stack spacing={1.5}>
               <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
                 <TextField select label="Nível de treino" value={trainingLevel} onChange={(event) => setTrainingLevel(event.target.value)} fullWidth>
-                  <MenuItem value="BEGINNER">BEGINNER</MenuItem>
-                  <MenuItem value="INTERMEDIATE">INTERMEDIATE</MenuItem>
-                  <MenuItem value="ADVANCED">ADVANCED</MenuItem>
+                  <MenuItem value="BEGINNER">Iniciante</MenuItem>
+                  <MenuItem value="INTERMEDIATE">Intermediário</MenuItem>
+                  <MenuItem value="ADVANCED">Avançado</MenuItem>
                 </TextField>
                 <TextField label="Idade" type="number" value={age} onChange={(event) => setAge(event.target.value)} fullWidth />
                 <TextField label="Peso (kg)" type="number" value={weightKg} onChange={(event) => setWeightKg(event.target.value)} fullWidth />
@@ -306,7 +344,7 @@ export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenP
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle2">Último registro</Typography>
               <Typography variant="body2" color="text.secondary">
-                {formatDateTime(anamnesis[0].recordedAt)} • Nível: {anamnesis[0].trainingLevel ?? "-"} • Peso:{" "}
+                {formatDateTime(anamnesis[0].recordedAt)} • Nível: {translateTrainingLevel(anamnesis[0].trainingLevel)} • Peso:{" "}
                 {formatNumber(anamnesis[0].weightKg, 1)} kg • Gordura: {formatNumber(anamnesis[0].bodyFatPct, 1)}%
               </Typography>
             </Box>
@@ -333,7 +371,7 @@ export function ProfileGoalsScreen({ token, onUserRefresh }: ProfileGoalsScreenP
             <TableBody>
               {goals.map((goal) => (
                 <TableRow key={goal.id}>
-                  <TableCell>{goal.type}</TableCell>
+                  <TableCell>{translateGoalType(goal.type)}</TableCell>
                   <TableCell>{goal.description ?? "-"}</TableCell>
                   <TableCell>{formatNumber(goal.targetValue, 2)}</TableCell>
                   <TableCell>{formatDate(goal.targetDate)}</TableCell>

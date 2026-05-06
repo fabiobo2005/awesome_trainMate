@@ -23,14 +23,26 @@ import { WorkoutLogScreen } from "./screens/workout-log-screen";
 
 type ScreenTab = "dashboard" | "workout" | "cardio" | "progress" | "library" | "plans" | "profile";
 
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Administrador",
+  TRAINER: "Treinador",
+  ATHLETE: "Aluno",
+  STUDENT: "Aluno"
+};
+
+function translateRole(role: string | null | undefined): string {
+  if (!role) return "";
+  return ROLE_LABELS[role] ?? role;
+}
+
 const tabs: Array<{ value: ScreenTab; label: string }> = [
-  { value: "dashboard", label: "Dashboard" },
-  { value: "workout", label: "Log Workout" },
-  { value: "cardio", label: "Log Cardio" },
-  { value: "progress", label: "Progress" },
+  { value: "dashboard", label: "Painel" },
+  { value: "workout", label: "Treino" },
+  { value: "cardio", label: "Cardio" },
+  { value: "progress", label: "Progresso" },
   { value: "library", label: "Biblioteca" },
   { value: "plans", label: "Planos" },
-  { value: "profile", label: "Profile/Goals" }
+  { value: "profile", label: "Perfil/Metas" }
 ];
 
 function AuthenticatedApp() {
@@ -86,7 +98,7 @@ function AuthenticatedApp() {
               TrainMate
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.9 }}>
-              {session.user.fullName} • {session.user.role}
+              {session.user.fullName} • {translateRole(session.user.role)}
             </Typography>
           </Box>
           <Button color="inherit" onClick={logout}>

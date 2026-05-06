@@ -10,8 +10,8 @@ type LoginScreenProps = {
 
 const quickAccounts = [
   { label: "Aluno", email: "aluno@trainmate.local", password: "123456" },
-  { label: "Trainer", email: "trainer@trainmate.local", password: "123456" },
-  { label: "Admin", email: "admin@trainmate.local", password: "123456" }
+  { label: "Treinador", email: "trainer@trainmate.local", password: "123456" },
+  { label: "Administrador", email: "admin@trainmate.local", password: "123456" }
 ];
 
 export function LoginScreen({ isLoading, errorMessage, onLogin, onClearError }: LoginScreenProps) {

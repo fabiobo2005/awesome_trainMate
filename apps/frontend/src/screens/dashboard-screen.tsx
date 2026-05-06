@@ -22,6 +22,30 @@ type DashboardScreenProps = {
   token: string;
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  "on-track": "No alvo",
+  watch: "Atenção",
+  "at-risk": "Em risco",
+  "off-track": "Fora do alvo",
+  behind: "Atrasado"
+};
+
+function translateStatus(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
+const RECOVERY_LABELS: Record<string, string> = {
+  low: "BAIXA",
+  moderate: "MODERADA",
+  medium: "MÉDIA",
+  high: "ALTA"
+};
+
+function translateRecovery(priority: string): string {
+  const normalized = priority?.toLowerCase?.() ?? "";
+  return RECOVERY_LABELS[normalized] ?? priority?.toUpperCase?.() ?? priority;
+}
+
 export function DashboardScreen({ token }: DashboardScreenProps) {
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
   const [aiSummary, setAiSummary] = useState<AiProgressSummary | null>(null);
@@ -77,7 +101,7 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Box>
           <Typography variant="h5" fontWeight={700}>
-            Dashboard
+            Painel
           </Typography>
           <Typography color="text.secondary">Resumo dos últimos 30 dias e recomendações do motor de IA.</Typography>
         </Box>
@@ -147,7 +171,7 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
                         ? "warning"
                         : "error"
                   }
-                  label={aiSummary.summary.status}
+                  label={translateStatus(aiSummary.summary.status)}
                 />
               </Stack>
               <Typography variant="body2">
@@ -187,7 +211,7 @@ export function DashboardScreen({ token }: DashboardScreenProps) {
               <Typography variant="body2">Foco: {recommendation.recommendation.next_focus}</Typography>
               <Typography variant="body2">
                 Prioridade de recuperação:{" "}
-                <strong>{recommendation.recommendation.recovery_priority.toUpperCase()}</strong>
+                <strong>{translateRecovery(recommendation.recommendation.recovery_priority)}</strong>
               </Typography>
               <Typography variant="subtitle2">Racional</Typography>
               <List dense disablePadding>

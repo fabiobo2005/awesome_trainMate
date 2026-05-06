@@ -135,15 +135,15 @@ def _cycle_stage(cycle_day: int) -> str:
 
 def _recommendation_focus(objective: str, preferred_split: str | None) -> str:
     if preferred_split:
-        return f"Execute next session using preferred split: {preferred_split}."
+        return f"Execute o próximo treino usando o split preferido: {preferred_split}."
 
     if objective == "hypertrophy":
-        return "Prioritize compound lifts first, then accessories with controlled tempo."
+        return "Priorize exercícios compostos primeiro e depois acessórios com tempo controlado."
     if objective == "strength":
-        return "Prioritize low-rep compound movements with full recovery between heavy sets."
+        return "Priorize movimentos compostos com poucas repetições e recuperação completa entre séries pesadas."
     if objective == "weight_loss":
-        return "Prioritize full-body density blocks and finish with moderate cardio."
-    return "Prioritize aerobic quality session with pacing consistency and controlled effort."
+        return "Priorize blocos de densidade full-body e finalize com cardio moderado."
+    return "Priorize uma sessão aeróbica de qualidade com pacing consistente e esforço controlado."
 
 
 def _compute_recommendation(payload: RecommendationInput) -> RecommendationOutput:
@@ -156,30 +156,30 @@ def _compute_recommendation(payload: RecommendationInput) -> RecommendationOutpu
         volume_adjustment_pct = -20.0
         intensity_adjustment_pct = -10.0
         recovery_priority = "high"
-        rationale.append("Recent average PSE is very high, indicating accumulated fatigue.")
+        rationale.append("PSE médio recente está muito alto, indicando fadiga acumulada.")
     elif payload.recent_pse_avg >= 7.5:
         volume_adjustment_pct = -10.0
         intensity_adjustment_pct = -5.0
         recovery_priority = "moderate"
-        rationale.append("Recent average PSE is elevated; reducing load prevents overreaching.")
+        rationale.append("PSE médio recente está elevado; reduzir a carga evita overreaching.")
     elif payload.recent_pse_avg <= 5.5 and payload.sessions_last_14_days >= 4:
         volume_adjustment_pct = 8.0
         intensity_adjustment_pct = 5.0
         recovery_priority = "low"
-        rationale.append("PSE is controlled with consistent frequency; room for progressive overload.")
+        rationale.append("PSE controlado com frequência consistente; há espaço para sobrecarga progressiva.")
     else:
-        rationale.append("Keep progression steady and evaluate response in the next microcycle.")
+        rationale.append("Mantenha a progressão estável e avalie a resposta no próximo microciclo.")
 
     if payload.days_since_last_session >= 4:
         volume_adjustment_pct = min(volume_adjustment_pct, -5.0)
-        rationale.append("Long gap since last session: start slightly conservative before ramp-up.")
+        rationale.append("Intervalo grande desde a última sessão: comece um pouco mais conservador antes de retomar.")
 
     if payload.last_session_total_load_kg <= 0:
-        rationale.append("No prior load baseline available; use conservative starting loads.")
+        rationale.append("Sem baseline de carga anterior; utilize cargas iniciais conservadoras.")
 
     recommendation = (
-        f"Adjust next session by {volume_adjustment_pct:+.0f}% volume and "
-        f"{intensity_adjustment_pct:+.0f}% intensity."
+        f"Ajuste o próximo treino em {volume_adjustment_pct:+.0f}% de volume e "
+        f"{intensity_adjustment_pct:+.0f}% de intensidade."
     )
 
     return RecommendationOutput(
@@ -200,13 +200,13 @@ def _compute_progress_summary(payload: ProgressSummaryInput) -> ProgressSummaryO
     actions: list[str] = []
 
     if payload.workout_sessions > 0:
-        highlights.append(f"{payload.workout_sessions} workout sessions logged in {payload.period_days} days.")
+        highlights.append(f"{payload.workout_sessions} sessões de musculação registradas em {payload.period_days} dias.")
     if payload.running_sessions > 0:
-        highlights.append(f"{payload.running_sessions} running sessions logged.")
+        highlights.append(f"{payload.running_sessions} sessões de cardio registradas.")
     if payload.total_load_kg > 0:
-        highlights.append(f"Total lifted load: {payload.total_load_kg:.1f} kg.")
+        highlights.append(f"Carga total levantada: {payload.total_load_kg:.1f} kg.")
     if payload.total_distance_km > 0:
-        highlights.append(f"Total running distance: {payload.total_distance_km:.2f} km.")
+        highlights.append(f"Distância total de corrida: {payload.total_distance_km:.2f} km.")
 
     status: Literal["on-track", "watch", "at-risk"] = "watch"
     if payload.adherence_rate >= 75 and (payload.avg_workout_pse is None or payload.avg_workout_pse <= 7.8):
@@ -215,19 +215,19 @@ def _compute_progress_summary(payload: ProgressSummaryInput) -> ProgressSummaryO
         status = "at-risk"
 
     if payload.adherence_rate < 60:
-        risks.append("Adherence is below target; consistency is limiting progression.")
-        actions.append("Plan fixed training slots for the next 7 days and target >=3 sessions/week.")
+        risks.append("Aderência abaixo da meta; a falta de consistência está limitando a progressão.")
+        actions.append("Agende horários fixos de treino para os próximos 7 dias e mire em 3 ou mais sessões por semana.")
     if payload.avg_workout_pse is not None and payload.avg_workout_pse >= 8:
-        risks.append("Average workout PSE is high, suggesting excessive fatigue.")
-        actions.append("Reduce volume by 10-15% for one microcycle and prioritize sleep/recovery.")
+        risks.append("PSE médio dos treinos está alto, sugerindo fadiga excessiva.")
+        actions.append("Reduza o volume em 10-15% por um microciclo e priorize sono e recuperação.")
     if payload.running_sessions > 0 and payload.avg_run_pse is not None and payload.avg_run_pse >= 8:
-        risks.append("Running effort is high; watch cumulative fatigue with strength sessions.")
-        actions.append("Shift one run to low intensity and keep interval quality day separated from leg day.")
+        risks.append("Esforço de corrida alto; observe a fadiga acumulada com as sessões de força.")
+        actions.append("Mude uma corrida para baixa intensidade e mantenha o dia de tiros separado do dia de pernas.")
 
     if not actions:
-        actions.append("Maintain current progression and recheck indicators at next 30-day checkpoint.")
+        actions.append("Mantenha a progressão atual e revise os indicadores no próximo checkpoint de 30 dias.")
     if not risks:
-        risks.append("No critical risks detected in current period.")
+        risks.append("Nenhum risco crítico detectado no período atual.")
 
     return ProgressSummaryOutput(
         period_days=payload.period_days,
@@ -252,35 +252,35 @@ def _compute_load_analysis(payload: LoadAnalysisInput) -> LoadAnalysisOutput:
     recommendations: list[str] = []
 
     if total_load <= 0:
-        imbalance_flags.append("No load data in selected window.")
-        recommendations.append("Log load for each set to enable accurate volume balancing.")
+        imbalance_flags.append("Sem dados de carga na janela selecionada.")
+        recommendations.append("Registre a carga de cada série para permitir o balanceamento preciso de volume.")
     else:
         top_share = (top_groups[0].total_load_kg / total_load) * 100 if top_groups else 0
         if top_share > 55:
             imbalance_flags.append(
-                f"Load concentration is high in '{top_groups[0].muscle_group}' ({top_share:.1f}% of total)."
+                f"Concentração de carga elevada em '{top_groups[0].muscle_group}' ({top_share:.1f}% do total)."
             )
-            recommendations.append("Redistribute weekly volume to secondary muscle groups.")
+            recommendations.append("Redistribua o volume semanal para grupos musculares secundários.")
 
         if len(top_groups) >= 2:
             ratio = top_groups[0].total_load_kg / max(top_groups[1].total_load_kg, 1e-6)
             if ratio > 2.0:
-                imbalance_flags.append("Top muscle group load is more than 2x the second group.")
-                recommendations.append("Increase accessory volume for under-trained groups by 10-20%.")
+                imbalance_flags.append("Carga do grupo principal é mais que 2x a do segundo grupo.")
+                recommendations.append("Aumente o volume de acessórios para grupos pouco treinados em 10-20%.")
 
         if not recommendations:
-            recommendations.append("Current load distribution looks balanced for the selected period.")
+            recommendations.append("A distribuição de carga atual parece equilibrada para o período selecionado.")
 
     delta_vs_previous: float | None = None
     if payload.previous_period_total_load_kg is not None and payload.previous_period_total_load_kg > 0:
         delta_vs_previous = ((total_load - payload.previous_period_total_load_kg) / payload.previous_period_total_load_kg) * 100
         if delta_vs_previous > 15:
-            recommendations.append("Total load increased sharply vs previous period; monitor recovery markers.")
+            recommendations.append("Carga total subiu fortemente vs período anterior; monitore marcadores de recuperação.")
         elif delta_vs_previous < -15:
-            recommendations.append("Total load dropped significantly; confirm if deload/taper was intentional.")
+            recommendations.append("Carga total caiu significativamente; confirme se o deload/taper foi intencional.")
 
     if not imbalance_flags:
-        imbalance_flags.append("No major volume imbalance detected.")
+        imbalance_flags.append("Nenhum desequilíbrio significativo de volume detectado.")
 
     return LoadAnalysisOutput(
         period_days=payload.period_days,
