@@ -288,7 +288,7 @@ function parseExercisesFromPlans(repoRoot: string): Map<string, ExerciseSeed> {
       throw new Error(`Arquivo de plano não encontrado: ${filePath}`);
     }
 
-    const workbook = XLSX.readFile(filePath, { cellDates: true });
+    const workbook = XLSX.read(fs.readFileSync(filePath), { cellDates: true, type: "buffer" });
     for (const sheetName of workbook.SheetNames) {
       if (!TARGET_SHEETS.has(sheetName.toLowerCase())) continue;
 
