@@ -4,6 +4,11 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: azd environment name
+        type: string
+        default: dev
 
 permissions:
   contents: read
@@ -14,372 +19,69 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  API_IMAGE_NAME: trainmate-api
-  AI_IMAGE_NAME: trainmate-ai
+  AZURE_ENV_NAME: ${{ github.event.inputs.environment || 'dev' }}
+  AZURE_LOCATION: canadacentral
 
 jobs:
-  publish-images:
-    name: Build and publish API/AI images
+  provision-deploy:
+    name: Provision and deploy via azd
     runs-on: ubuntu-latest
-    outputs:
-      api_image: ${{ steps.image-meta.outputs.api_image }}
-      ai_image: ${{ steps.image-meta.outputs.ai_image }}
-      image_tag: ${{ steps.image-meta.outputs.image_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate required backend variables
+      - name: Validate required variables
         env:
-          AZURE_CLIENT_ID_BACKEND: ${{ vars.AZURE_CLIENT_ID_BACKEND }}
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID_BACKEND: ${{ vars.AZURE_SUBSCRIPTION_ID_BACKEND }}
-          ACR_NAME: ${{ vars.ACR_NAME }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_PRINCIPAL_ID: ${{ vars.AZURE_PRINCIPAL_ID }}
         run: |
           set -euo pipefail
-          required_vars=(
-            AZURE_CLIENT_ID_BACKEND
-            AZURE_TENANT_ID
-            AZURE_SUBSCRIPTION_ID_BACKEND
-            ACR_NAME
-          )
-          for var_name in "${required_vars[@]}"; do
-            if [ -z "${!var_name:-}" ]; then
-              echo "Missing repository variable: ${var_name}" >&2
+          required=(AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_PRINCIPAL_ID)
+          for v in "${required[@]}"; do
+            if [ -z "${!v:-}" ]; then
+              echo "Missing repository variable: $v" >&2
               exit 1
             fi
           done
 
-      - name: Azure login (backend subscription)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID_BACKEND }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID_BACKEND }}
+      - name: Install azd
+        uses: Azure/setup-azd@v2
 
-      - name: Resolve ACR login server
-        id: acr
+      - name: Azure login (OIDC)
         run: |
-          set -euo pipefail
-          login_server="$(az acr show --name "${{ vars.ACR_NAME }}" --query "loginServer" -o tsv)"
-          echo "login_server=${login_server}" >> "${GITHUB_OUTPUT}"
+          azd auth login \
+            --client-id "${{ vars.AZURE_CLIENT_ID }}" \
+            --federated-credential-provider github \
+            --tenant-id "${{ vars.AZURE_TENANT_ID }}"
 
-      - name: Login to ACR
-        run: az acr login --name "${{ vars.ACR_NAME }}"
-
-      - name: Compose image metadata
-        id: image-meta
-        run: |
-          set -euo pipefail
-          image_tag="${GITHUB_SHA::12}"
-          api_image="${{ steps.acr.outputs.login_server }}/${{ env.API_IMAGE_NAME }}:${image_tag}"
-          ai_image="${{ steps.acr.outputs.login_server }}/${{ env.AI_IMAGE_NAME }}:${image_tag}"
-          echo "image_tag=${image_tag}" >> "${GITHUB_OUTPUT}"
-          echo "api_image=${api_image}" >> "${GITHUB_OUTPUT}"
-          echo "ai_image=${ai_image}" >> "${GITHUB_OUTPUT}"
-
-      - name: Build API image
-        run: |
-          set -euo pipefail
-          docker build -f apps/api/Dockerfile \
-            -t "${{ steps.image-meta.outputs.api_image }}" \
-            -t "${{ steps.acr.outputs.login_server }}/${{ env.API_IMAGE_NAME }}:latest" \
-            .
-
-      - name: Build AI image
-        run: |
-          set -euo pipefail
-          docker build -f apps/ai/Dockerfile \
-            -t "${{ steps.image-meta.outputs.ai_image }}" \
-            -t "${{ steps.acr.outputs.login_server }}/${{ env.AI_IMAGE_NAME }}:latest" \
-            .
-
-      - name: Push API image
-        run: |
-          set -euo pipefail
-          docker push "${{ steps.image-meta.outputs.api_image }}"
-          docker push "${{ steps.acr.outputs.login_server }}/${{ env.API_IMAGE_NAME }}:latest"
-
-      - name: Push AI image
-        run: |
-          set -euo pipefail
-          docker push "${{ steps.image-meta.outputs.ai_image }}"
-          docker push "${{ steps.acr.outputs.login_server }}/${{ env.AI_IMAGE_NAME }}:latest"
-
-  deploy-api-aci:
-    name: Deploy API container group
-    runs-on: ubuntu-latest
-    needs: publish-images
-    steps:
-      - name: Validate required backend variables
+      - name: Set azd env config
         env:
-          AZURE_CLIENT_ID_BACKEND: ${{ vars.AZURE_CLIENT_ID_BACKEND }}
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID_BACKEND: ${{ vars.AZURE_SUBSCRIPTION_ID_BACKEND }}
-          ACI_API_RESOURCE_GROUP: ${{ vars.ACI_API_RESOURCE_GROUP }}
-          ACI_API_CONTAINER_GROUP: ${{ vars.ACI_API_CONTAINER_GROUP }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_PRINCIPAL_ID: ${{ vars.AZURE_PRINCIPAL_ID }}
         run: |
-          set -euo pipefail
-          required_vars=(
-            AZURE_CLIENT_ID_BACKEND
-            AZURE_TENANT_ID
-            AZURE_SUBSCRIPTION_ID_BACKEND
-            ACI_API_RESOURCE_GROUP
-            ACI_API_CONTAINER_GROUP
-          )
-          for var_name in "${required_vars[@]}"; do
-            if [ -z "${!var_name:-}" ]; then
-              echo "Missing repository variable: ${var_name}" >&2
-              exit 1
-            fi
-          done
+          azd env new "$AZURE_ENV_NAME" --location "$AZURE_LOCATION" --subscription "$AZURE_SUBSCRIPTION_ID" --no-prompt || \
+            azd env select "$AZURE_ENV_NAME"
+          azd env set AZURE_PRINCIPAL_ID "$AZURE_PRINCIPAL_ID"
 
-      - name: Azure login (backend subscription)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID_BACKEND }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID_BACKEND }}
+      - name: Provision (Bicep)
+        run: azd provision --no-prompt
 
-      - name: Export, replace image and recreate API ACI
-        env:
-          RESOURCE_GROUP: ${{ vars.ACI_API_RESOURCE_GROUP }}
-          CONTAINER_GROUP: ${{ vars.ACI_API_CONTAINER_GROUP }}
-          NEW_IMAGE: ${{ needs.publish-images.outputs.api_image }}
+      - name: Deploy services
+        run: azd deploy --no-prompt
+
+      - name: Show endpoints
         run: |
-          set -euo pipefail
-          export_file="api-container-group.yaml"
-
-          az container export \
-            --resource-group "${RESOURCE_GROUP}" \
-            --name "${CONTAINER_GROUP}" \
-            --file "${export_file}"
-
-          python - "${export_file}" "${NEW_IMAGE}" <<'PY'
-          import sys
-
-          path, new_image = sys.argv[1], sys.argv[2]
-          original_lines = open(path, encoding="utf-8").read().splitlines()
-          lines = []
-          for line in original_lines:
-              stripped = line.lstrip()
-              if stripped.startswith("provisioningTimeoutInSeconds:") or stripped.startswith("customProvisioningTimeoutInSeconds:"):
-                  continue
-              lines.append(line)
-          replaced = False
-          for index, line in enumerate(lines):
-              if not replaced and line.lstrip().startswith("image:"):
-                  indent = line[: len(line) - len(line.lstrip())]
-                  lines[index] = f"{indent}image: {new_image}"
-                  replaced = True
-          if not replaced:
-              raise SystemExit("Could not find image field in exported API container spec.")
-          with open(path, "w", encoding="utf-8") as file:
-              file.write("\n".join(lines) + "\n")
-          PY
-
-          az container delete \
-            --resource-group "${RESOURCE_GROUP}" \
-            --name "${CONTAINER_GROUP}" \
-            --yes
-
-          az container create \
-            --resource-group "${RESOURCE_GROUP}" \
-            --file "${export_file}"
-
-      - name: Wait for API ACI running state
-        env:
-          RESOURCE_GROUP: ${{ vars.ACI_API_RESOURCE_GROUP }}
-          CONTAINER_GROUP: ${{ vars.ACI_API_CONTAINER_GROUP }}
-        run: |
-          set -euo pipefail
-          for _ in {1..36}; do
-            state="$(az container show --resource-group "${RESOURCE_GROUP}" --name "${CONTAINER_GROUP}" --query "instanceView.state" -o tsv)"
-            if [ "${state}" = "Running" ]; then
-              echo "API container group is Running."
-              exit 0
-            fi
-            echo "Current API state: ${state}. Waiting..."
-            sleep 10
-          done
-          echo "API container group did not reach Running state." >&2
-          exit 1
-
-  deploy-ai-aci:
-    name: Deploy AI container group
-    runs-on: ubuntu-latest
-    needs: publish-images
-    steps:
-      - name: Validate required data-ai variables
-        env:
-          AZURE_CLIENT_ID_DATA_AI: ${{ vars.AZURE_CLIENT_ID_DATA_AI }}
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID_DATA_AI: ${{ vars.AZURE_SUBSCRIPTION_ID_DATA_AI }}
-          ACI_AI_RESOURCE_GROUP: ${{ vars.ACI_AI_RESOURCE_GROUP }}
-          ACI_AI_CONTAINER_GROUP: ${{ vars.ACI_AI_CONTAINER_GROUP }}
-        run: |
-          set -euo pipefail
-          required_vars=(
-            AZURE_CLIENT_ID_DATA_AI
-            AZURE_TENANT_ID
-            AZURE_SUBSCRIPTION_ID_DATA_AI
-            ACI_AI_RESOURCE_GROUP
-            ACI_AI_CONTAINER_GROUP
-          )
-          for var_name in "${required_vars[@]}"; do
-            if [ -z "${!var_name:-}" ]; then
-              echo "Missing repository variable: ${var_name}" >&2
-              exit 1
-            fi
-          done
-
-      - name: Azure login (data-ai subscription)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID_DATA_AI }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID_DATA_AI }}
-
-      - name: Export, replace image and recreate AI ACI
-        env:
-          RESOURCE_GROUP: ${{ vars.ACI_AI_RESOURCE_GROUP }}
-          CONTAINER_GROUP: ${{ vars.ACI_AI_CONTAINER_GROUP }}
-          NEW_IMAGE: ${{ needs.publish-images.outputs.ai_image }}
-        run: |
-          set -euo pipefail
-          export_file="ai-container-group.yaml"
-
-          az container export \
-            --resource-group "${RESOURCE_GROUP}" \
-            --name "${CONTAINER_GROUP}" \
-            --file "${export_file}"
-
-          python - "${export_file}" "${NEW_IMAGE}" <<'PY'
-          import sys
-
-          path, new_image = sys.argv[1], sys.argv[2]
-          original_lines = open(path, encoding="utf-8").read().splitlines()
-          lines = []
-          for line in original_lines:
-              stripped = line.lstrip()
-              if stripped.startswith("provisioningTimeoutInSeconds:") or stripped.startswith("customProvisioningTimeoutInSeconds:"):
-                  continue
-              lines.append(line)
-          replaced = False
-          for index, line in enumerate(lines):
-              if not replaced and line.lstrip().startswith("image:"):
-                  indent = line[: len(line) - len(line.lstrip())]
-                  lines[index] = f"{indent}image: {new_image}"
-                  replaced = True
-          if not replaced:
-              raise SystemExit("Could not find image field in exported AI container spec.")
-          with open(path, "w", encoding="utf-8") as file:
-              file.write("\n".join(lines) + "\n")
-          PY
-
-          az container delete \
-            --resource-group "${RESOURCE_GROUP}" \
-            --name "${CONTAINER_GROUP}" \
-            --yes
-
-          az container create \
-            --resource-group "${RESOURCE_GROUP}" \
-            --file "${export_file}"
-
-      - name: Wait for AI ACI running state
-        env:
-          RESOURCE_GROUP: ${{ vars.ACI_AI_RESOURCE_GROUP }}
-          CONTAINER_GROUP: ${{ vars.ACI_AI_CONTAINER_GROUP }}
-        run: |
-          set -euo pipefail
-          for _ in {1..36}; do
-            state="$(az container show --resource-group "${RESOURCE_GROUP}" --name "${CONTAINER_GROUP}" --query "instanceView.state" -o tsv)"
-            if [ "${state}" = "Running" ]; then
-              echo "AI container group is Running."
-              exit 0
-            fi
-            echo "Current AI state: ${state}. Waiting..."
-            sleep 10
-          done
-          echo "AI container group did not reach Running state." >&2
-          exit 1
-
-  deploy-frontend-swa:
-    name: Deploy frontend to Static Web Apps
-    runs-on: ubuntu-latest
-    needs: publish-images
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate required frontend variables
-        env:
-          AZURE_CLIENT_ID_FRONTEND: ${{ vars.AZURE_CLIENT_ID_FRONTEND }}
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID_FRONTEND: ${{ vars.AZURE_SUBSCRIPTION_ID_FRONTEND }}
-          SWA_RESOURCE_GROUP: ${{ vars.SWA_RESOURCE_GROUP }}
-          SWA_NAME: ${{ vars.SWA_NAME }}
-        run: |
-          set -euo pipefail
-          required_vars=(
-            AZURE_CLIENT_ID_FRONTEND
-            AZURE_TENANT_ID
-            AZURE_SUBSCRIPTION_ID_FRONTEND
-            SWA_RESOURCE_GROUP
-            SWA_NAME
-          )
-          for var_name in "${required_vars[@]}"; do
-            if [ -z "${!var_name:-}" ]; then
-              echo "Missing repository variable: ${var_name}" >&2
-              exit 1
-            fi
-          done
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build frontend
-        env:
-          VITE_API_BASE_URL: ${{ vars.FRONTEND_API_BASE_URL }}
-        run: npm run build -w apps/frontend
-
-      - name: Azure login (frontend subscription)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID_FRONTEND }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID_FRONTEND }}
-
-      - name: Ensure staticwebapp extension
-        run: az extension add --name staticwebapp --upgrade
-
-      - name: Fetch Static Web App deployment token
-        id: swa-token
-        env:
-          SWA_RESOURCE_GROUP: ${{ vars.SWA_RESOURCE_GROUP }}
-          SWA_NAME: ${{ vars.SWA_NAME }}
-        run: |
-          set -euo pipefail
-          token="$(az staticwebapp secrets list --resource-group "${SWA_RESOURCE_GROUP}" --name "${SWA_NAME}" --query "properties.apiKey" -o tsv)"
-          if [ -z "${token}" ]; then
-            echo "Unable to resolve Static Web App deployment token." >&2
-            exit 1
-          fi
-          echo "::add-mask::${token}"
-          echo "token=${token}" >> "${GITHUB_OUTPUT}"
-
-      - name: Deploy static frontend artifact
-        uses: azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: apps/frontend/dist
-          skip_app_build: true
-          skip_api_build: true
+          API_URL=$(azd env get-values | grep '^AZURE_API_BASE_URL=' | cut -d= -f2- | tr -d '"')
+          AI_URL=$(azd env get-values | grep '^AZURE_AI_BASE_URL=' | cut -d= -f2- | tr -d '"')
+          WEB_URL=$(azd env get-values | grep '^AZURE_WEB_HOSTNAME=' | cut -d= -f2- | tr -d '"')
+          {
+            echo "## Deploy concluído"
+            echo ""
+            echo "| Serviço | URL |"
+            echo "|---|---|"
+            echo "| Frontend | https://$WEB_URL |"
+            echo "| API | $API_URL |"
+            echo "| AI | $AI_URL |"
+          } >> "$GITHUB_STEP_SUMMARY"
