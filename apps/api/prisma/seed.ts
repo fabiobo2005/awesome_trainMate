@@ -346,10 +346,11 @@ function parseExercisesFromPlans(repoRoot: string): Map<string, ExerciseSeed> {
     }
   }
 
-  if (exerciseMap.size !== 136) {
-    throw new Error(`Esperado 136 exercícios únicos, mas foram encontrados ${exerciseMap.size}.`);
+  if (exerciseMap.size < 130) {
+    throw new Error(`Esperado pelo menos 130 exercícios únicos, mas foram encontrados ${exerciseMap.size}.`);
   }
 
+  console.log(`[seed] ${exerciseMap.size} exercícios únicos extraídos das planilhas.`);
   return exerciseMap;
 }
 

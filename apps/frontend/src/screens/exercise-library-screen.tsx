@@ -78,7 +78,11 @@ export function ExerciseLibraryScreen({ token }: ExerciseLibraryScreenProps) {
         <Typography variant="h5" fontWeight={700}>
           Biblioteca de Exercícios
         </Typography>
-        <Typography color="text.secondary">Catálogo inicial populado com os 136 exercícios extraídos das planilhas.</Typography>
+        <Typography color="text.secondary">
+          {exercises.length > 0
+            ? `Catálogo populado com ${exercises.length} exercícios extraídos das planilhas de treino.`
+            : "Catálogo de exercícios extraídos das planilhas de treino."}
+        </Typography>
       </Box>
 
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
