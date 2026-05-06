@@ -23,6 +23,9 @@ param mysqlAdministratorPassword string = newGuid()
 @secure()
 param jwtSecret string = newGuid()
 
+@description('Set to "true" to run prisma db seed on container start. Use only on first deploy or when reseeding.')
+param runDbSeed string = 'false'
+
 var abbrs = loadJsonContent('./abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = {
@@ -51,6 +54,7 @@ module resources 'resources.bicep' = {
     mysqlAdministratorLogin: mysqlAdministratorLogin
     mysqlAdministratorPassword: mysqlAdministratorPassword
     jwtSecret: jwtSecret
+    runDbSeed: runDbSeed
   }
 }
 

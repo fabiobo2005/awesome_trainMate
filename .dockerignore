@@ -9,6 +9,5 @@ node_modules
 **/.cache
 infra/.terraform
 infra/**/.terraform
-*.xlsx
 *.log
 coverage

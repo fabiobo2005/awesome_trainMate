@@ -14,10 +14,30 @@ import { healthRouter } from "./routes/health.js";
 
 export const app = express();
 
-const allowedCorsOrigins = env.CORS_ORIGINS.split(",")
+app.set("trust proxy", 1);
+
+const corsEntries = env.CORS_ORIGINS.split(",")
   .map((value) => value.trim())
   .filter((value) => value.length > 0);
-const allowAllOrigins = allowedCorsOrigins.includes("*");
+const allowAllOrigins = corsEntries.includes("*");
+const allowedExactOrigins = new Set<string>();
+const allowedOriginPatterns: RegExp[] = [];
+for (const entry of corsEntries) {
+  if (entry === "*") continue;
+  if (entry.includes("*")) {
+    const pattern = "^" + entry.split("*").map((segment) => segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$";
+    allowedOriginPatterns.push(new RegExp(pattern, "i"));
+  } else {
+    allowedExactOrigins.add(entry.toLowerCase());
+  }
+}
+
+function isOriginAllowed(origin: string): boolean {
+  if (allowAllOrigins) return true;
+  const normalized = origin.toLowerCase();
+  if (allowedExactOrigins.has(normalized)) return true;
+  return allowedOriginPatterns.some((re) => re.test(normalized));
+}
 
 app.use(helmet());
 app.use(requestIdMiddleware);
@@ -42,7 +62,7 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowAllOrigins || allowedCorsOrigins.includes(origin)) {
+      if (!origin || isOriginAllowed(origin)) {
         callback(null, true);
         return;
       }
@@ -68,7 +88,7 @@ app.use("/api", apiRateLimitMiddleware, apiRouter);
 app.use(errorHandler);
 
 log("info", "api hardening configured", {
-  allowedCorsOrigins: allowAllOrigins ? ["*"] : allowedCorsOrigins,
+  allowedCorsOrigins: allowAllOrigins ? ["*"] : corsEntries,
   rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
   rateLimitMaxRequests: env.RATE_LIMIT_MAX_REQUESTS
 });

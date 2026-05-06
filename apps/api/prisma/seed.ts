@@ -365,9 +365,7 @@ async function seedUsers(): Promise<void> {
     update: {
       fullName: "TrainMate Admin",
       role: UserRole.ADMIN,
-      status: UserStatus.ACTIVE,
-      passwordHash: defaultPasswordHash,
-      mustChangePassword: true
+      status: UserStatus.ACTIVE
     },
     create: {
       email: "admin@trainmate.local",
@@ -384,9 +382,7 @@ async function seedUsers(): Promise<void> {
     update: {
       fullName: "TrainMate Trainer",
       role: UserRole.TRAINER,
-      status: UserStatus.ACTIVE,
-      passwordHash: defaultPasswordHash,
-      mustChangePassword: true
+      status: UserStatus.ACTIVE
     },
     create: {
       email: "trainer@trainmate.local",
@@ -403,9 +399,7 @@ async function seedUsers(): Promise<void> {
     update: {
       fullName: "TrainMate Aluno",
       role: UserRole.STUDENT,
-      status: UserStatus.ACTIVE,
-      passwordHash: defaultPasswordHash,
-      mustChangePassword: true
+      status: UserStatus.ACTIVE
     },
     create: {
       email: "aluno@trainmate.local",

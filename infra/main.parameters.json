@@ -10,6 +10,9 @@
     },
     "principalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
+    },
+    "runDbSeed": {
+      "value": "${RUN_DB_SEED=false}"
     }
   }
 }
